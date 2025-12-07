@@ -1,6 +1,7 @@
 using PCG.Environment;
 using UnityEngine;
 using Unity.Collections;
+using PCG.Rendering;
 
 namespace PCG.Core
 {
@@ -20,6 +21,10 @@ namespace PCG.Core
         [Header("Settings")]
         [Tooltip("Algorithm used by the generation.")]
         [SerializeField] private GenerationAlgorithm _algorithmType;
+        
+        [Header("Visualization")]
+        [SerializeField] private MeshFilter _meshFilter;
+        [SerializeField] private MeshRenderer _meshRenderer;
 
         private MapData _currentMap;
 
@@ -42,7 +47,12 @@ namespace PCG.Core
             Vector2Int size = new Vector2Int(_config.Width, _config.Height);
             _currentMap = strategy.Generate(_config.Seed, size);
             
-            Debug.Log($"Generated: {_algorithmType}");
+            Debug.Log("Procedurally building mesh...");
+            Mesh levelMesh = SimpleMeshBuilder.BuildMesh(_currentMap, 1.0f);
+    
+            _meshFilter.mesh = levelMesh;
+    
+            Debug.Log($"<color=green>Generation completed:</color> {_algorithmType}");
         }
 
         private IGeneratorStrategy GetStrategy(GenerationAlgorithm type)
