@@ -48,7 +48,7 @@ namespace PCG.Core
             _currentMap = strategy.Generate(_config.Seed, size);
             
             Debug.Log("Procedurally building mesh...");
-            Mesh levelMesh = SimpleMeshBuilder.BuildMesh(_currentMap, 1.0f);
+            Mesh levelMesh = ProceduralMeshBuilder.BuildMesh(_currentMap);
     
             _meshFilter.mesh = levelMesh;
     
@@ -90,7 +90,7 @@ namespace PCG.Core
         
         // This Unity event permits to draw visual debug elements in the Scene View.
         // It is extremely useful to verify the logic without instantiating GameObjects (which is slow).
-        private void OnDrawGizmos()
+        /*private void OnDrawGizmos()
         {
             if (!_currentMap.Grid.IsCreated)
             {
@@ -120,6 +120,6 @@ namespace PCG.Core
                     }
                 }
             }
-        }
+        }*/
     }
 }
