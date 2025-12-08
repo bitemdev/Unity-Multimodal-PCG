@@ -1,0 +1,104 @@
+using PCG.Environment;
+using UnityEngine;
+using Unity.Collections;
+using PCG.Rendering;
+using System.Diagnostics;
+
+namespace PCG.Core
+{
+    public enum GenerationAlgorithm
+    {
+        Maze_Backtracker,
+        Dungeon_BSP
+    }
+    
+    [DisallowMultipleComponent] // With this, only 1 manager per gameobject is allowed
+    public class PCGManager : MonoBehaviour
+    {
+        [Header("Dependencies")]
+        [Tooltip("Configuration file with base parameters.")]
+        [SerializeField] private PCGConfiguration _config;
+        
+        [Header("Settings")]
+        [Tooltip("Algorithm used by the generation.")]
+        [SerializeField] private GenerationAlgorithm _algorithmType;
+        
+        [Header("Visualization")]
+        [SerializeField] private MeshFilter _meshFilter;
+        [SerializeField] private MeshRenderer _meshRenderer;
+
+        private MapData _currentMap;
+
+        // This method generates a level
+        [ContextMenu("Generate Level")] // It allows to play from inspector without actually playing
+        public void GenerateLevel()
+        {
+            if (_currentMap.Grid.IsCreated) // If a map is already created, it shall be cleaned up to prevent memory leaks
+            {
+                _currentMap.Dispose();
+            }
+
+            if (_config == null)
+            {
+                UnityEngine.Debug.LogError("PCGManager config is missing!");
+                return;
+            }
+
+            IGeneratorStrategy strategy = GetStrategy(_algorithmType);
+            
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            
+            Vector2Int size = new Vector2Int(_config.Width, _config.Height);
+            _currentMap = strategy.Generate(_config.Seed, size);
+            
+            long logicTime = sw.ElapsedMilliseconds; // Capturated logic time (array data generation time)
+            
+            Mesh levelMesh = ProceduralMeshBuilder.BuildMesh(_currentMap);
+            
+            sw.Stop();
+            long renderTime = sw.ElapsedMilliseconds - logicTime; // Visual delta
+    
+            _meshFilter.mesh = levelMesh;
+    
+            string log = $"[PCG Stats] Map: {_config.Width}x{_config.Height} | ";
+            log += $"Total: {sw.Elapsed.TotalMilliseconds:F2}ms (Logic: {logicTime}ms | Mesh: {renderTime}ms) | ";
+            log += $"Vertices: {levelMesh.vertexCount} | Triangles: {levelMesh.triangles.Length / 3}";
+    
+            UnityEngine.Debug.Log(log);
+        }
+
+        private IGeneratorStrategy GetStrategy(GenerationAlgorithm type)
+        {
+            switch (type)
+            {
+                case GenerationAlgorithm.Maze_Backtracker:
+                    return new MazeGenerator();
+                case GenerationAlgorithm.Dungeon_BSP:
+                    return new DungeonGenerator();
+                default:
+                    return new MazeGenerator();
+            }
+        }
+
+        // This method is called both when game's closed and scene's been changed. It is mandatory to clean up NativeArrays here
+        private void OnDestroy()
+        {
+            if (_currentMap.Grid.IsCreated)
+            {
+                _currentMap.Dispose();
+                UnityEngine.Debug.Log("Map memory cleaned.");
+            }
+        }
+        
+        // This method is called when a script is deactivated or Unity is recompiling
+        private void OnDisable()
+        {
+            if (_currentMap.Grid.IsCreated)
+            {
+                _currentMap.Dispose();
+                UnityEngine.Debug.Log("Map memory cleaned.");
+            }
+        }
+    }
+}
