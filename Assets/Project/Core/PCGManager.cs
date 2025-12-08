@@ -2,6 +2,7 @@ using PCG.Environment;
 using UnityEngine;
 using Unity.Collections;
 using PCG.Rendering;
+using System.Diagnostics;
 
 namespace PCG.Core
 {
@@ -39,20 +40,32 @@ namespace PCG.Core
 
             if (_config == null)
             {
-                Debug.LogError("PCGManager config is missing!");
+                UnityEngine.Debug.LogError("PCGManager config is missing!");
                 return;
             }
 
             IGeneratorStrategy strategy = GetStrategy(_algorithmType);
+            
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            
             Vector2Int size = new Vector2Int(_config.Width, _config.Height);
             _currentMap = strategy.Generate(_config.Seed, size);
             
-            Debug.Log("Procedurally building mesh...");
+            long logicTime = sw.ElapsedMilliseconds; // Capturated logic time (array data generation time)
+            
             Mesh levelMesh = ProceduralMeshBuilder.BuildMesh(_currentMap);
+            
+            sw.Stop();
+            long renderTime = sw.ElapsedMilliseconds - logicTime; // Visual delta
     
             _meshFilter.mesh = levelMesh;
     
-            Debug.Log($"<color=green>Generation completed:</color> {_algorithmType}");
+            string log = $"[PCG Stats] Map: {_config.Width}x{_config.Height} | ";
+            log += $"Total: {sw.Elapsed.TotalMilliseconds:F2}ms (Logic: {logicTime}ms | Mesh: {renderTime}ms) | ";
+            log += $"Vertices: {levelMesh.vertexCount} | Triangles: {levelMesh.triangles.Length / 3}";
+    
+            UnityEngine.Debug.Log(log);
         }
 
         private IGeneratorStrategy GetStrategy(GenerationAlgorithm type)
@@ -74,7 +87,7 @@ namespace PCG.Core
             if (_currentMap.Grid.IsCreated)
             {
                 _currentMap.Dispose();
-                Debug.Log("Map memory cleaned.");
+                UnityEngine.Debug.Log("Map memory cleaned.");
             }
         }
         
@@ -84,42 +97,8 @@ namespace PCG.Core
             if (_currentMap.Grid.IsCreated)
             {
                 _currentMap.Dispose();
-                Debug.Log("Map memory cleaned.");
+                UnityEngine.Debug.Log("Map memory cleaned.");
             }
         }
-        
-        // This Unity event permits to draw visual debug elements in the Scene View.
-        // It is extremely useful to verify the logic without instantiating GameObjects (which is slow).
-        /*private void OnDrawGizmos()
-        {
-            if (!_currentMap.Grid.IsCreated)
-            {
-                return;
-            }
-
-            Vector3 cellSize = new Vector3(1f, 0.1f, 1f);
-
-            for (int x = 0; x < _currentMap.Width; x++)
-            {
-                for (int y = 0; y < _currentMap.Height; y++)
-                {
-                    int index = _currentMap.GetIndex(x, y);
-                    CellType cell = _currentMap.Grid[index];
-                    
-                    Vector3 pos = new Vector3(x, 0, y);
-
-                    if (cell == CellType.Floor)
-                    {
-                        Gizmos.color = Color.cyan;
-                        Gizmos.DrawCube(pos, cellSize);
-                    }
-                    else if (cell == CellType.Wall)
-                    {
-                        Gizmos.color = Color.black;
-                        Gizmos.DrawCube(pos, cellSize);
-                    }
-                }
-            }
-        }*/
     }
 }
