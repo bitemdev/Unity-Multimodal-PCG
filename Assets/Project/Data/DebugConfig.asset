@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00a383da7b1daf647b4e30c30dc0ea95, type: 3}
   m_Name: DebugConfig
   m_EditorClassIdentifier: 
-  _seed: 12345
+  _seed: 54546
   _width: 21
   _height: 21

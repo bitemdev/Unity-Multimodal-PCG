@@ -18,7 +18,7 @@ namespace PCG.Core
         {
             Width = width;
             Height = height;
-            Grid = new NativeArray<CellType>(width * height, allocator);
+            Grid = new NativeArray<CellType>(width * height, allocator); // As the size of the collection is known, array is better than List -> List is used when size is unknown
         }
 
         // This method returns the position in the 1D grid (as it receives 2D parameters). Mathematically, row * totalWidth + column
