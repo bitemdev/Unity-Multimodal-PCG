@@ -62,7 +62,7 @@ namespace PCG.Core
                 case GenerationAlgorithm.Maze_Backtracker:
                     return new MazeGenerator();
                 case GenerationAlgorithm.Dungeon_BSP:
-                    return new MazeGenerator();
+                    return new DungeonGenerator();
                 default:
                     return new MazeGenerator();
             }

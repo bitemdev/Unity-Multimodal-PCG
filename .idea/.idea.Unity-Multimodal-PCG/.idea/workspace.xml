@@ -6,12 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="9793d3e9-fe30-41e0-9044-0ad29646b849" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Unity-Multimodal-PCG/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Unity-Multimodal-PCG/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/MapData.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Core/MapData.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Project/Core/PCGManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Core/PCGManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/Rendering/SimpleMeshBuilder.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/Rendering/SimpleMeshBuilder.cs.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Project/Data/DebugConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Data/DebugConfig.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectSettings/URPProjectSettings.asset" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectSettings/URPProjectSettings.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Environment/MazeGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Modules/Environment/MazeGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,7 +42,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "feat/optimised-mesh-generation",
+    "git-widget-placeholder": "feat/dungeon-bsp-generation",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
     "node.js.detected.package.eslint": "true",

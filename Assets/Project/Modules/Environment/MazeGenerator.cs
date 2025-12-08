@@ -20,8 +20,8 @@ namespace PCG.Environment
         {
             Debug.Log($"[MazeGenerator] Starting with Seed: {seed}");
 
-            var map = new MapData(size.x, size.y, Allocator.Persistent); // Data container creation
-            var rng = new Random((uint)seed);
+            MapData map = new MapData(size.x, size.y, Allocator.Persistent); // Data container creation
+            Random rng = new Random((uint)seed);
             
             // At first, everything's wall
             for (int i = 0; i < map.Grid.Length; i++)
