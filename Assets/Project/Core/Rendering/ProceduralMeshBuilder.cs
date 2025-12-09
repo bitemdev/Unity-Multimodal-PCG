@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PCG.Rendering
 {
-    static public class ProceduralMeshBuilder
+    public static class ProceduralMeshBuilder
     {
         // Const values to optimise
         private const float WallHeight = 1.0f;
@@ -12,11 +12,11 @@ namespace PCG.Rendering
         private const float CellSize = 1.0f;
         
         // Debug colors
-        static private readonly Color WallColor = new Color(0f, 0.121f, 0.247f);
-        static private readonly Color FloorColor = new Color(0.968f, 0.905f, 0.807f);
+         private static readonly Color WallColor = new Color(0f, 0.121f, 0.247f);
+         private static readonly Color FloorColor = new Color(0.968f, 0.905f, 0.807f);
         
         // This method generates an optimised mesh based on mapdata
-        static public Mesh BuildMesh(MapData map)
+        public static Mesh BuildMesh(MapData map)
         {
             List<Vector3> vertices = new List<Vector3>();
             List<int> triangles = new List<int>();
@@ -56,7 +56,7 @@ namespace PCG.Rendering
         }
 
         // This method generates a single cell based on its info
-        static private void BuildCell(int x, int y, CellType type, Vector3 pos, MapData map, List<Vector3> verts, List<int> tris, List<Color> colors)
+        private static void BuildCell(int x, int y, CellType type, Vector3 pos, MapData map, List<Vector3> verts, List<int> tris, List<Color> colors)
         {
             float height = (type == CellType.Wall) ? WallHeight : FloorHeight; // If it's wall then WallHeight, otherwise it's floor minimum height
             float yCenter = (type == CellType.Wall) ? WallHeight / 2 : FloorHeight / 2;
@@ -125,7 +125,7 @@ namespace PCG.Rendering
         }
 
         // This method determines whether a face should be rendered or not based on optimisation rules
-        static private bool ShouldDrawFace(int neighborX, int neighborY, CellType currentType, MapData map)
+        private static bool ShouldDrawFace(int neighborX, int neighborY, CellType currentType, MapData map)
         {
             if (neighborX < 0 || neighborX >= map.Width || neighborY < 0 || neighborY >= map.Height) // If neighbour is out of the map, it's a border -> DRAW
             {
@@ -149,7 +149,7 @@ namespace PCG.Rendering
         }
 
         // This method generates faces
-        static private void AddQuad(List<Vector3> verts, List<int> tris, List<Color> colors, Color c, Vector3 tl, Vector3 tr, Vector3 br, Vector3 bl)
+        private static void AddQuad(List<Vector3> verts, List<int> tris, List<Color> colors, Color c, Vector3 tl, Vector3 tr, Vector3 br, Vector3 bl)
         {
             int index = verts.Count;
             

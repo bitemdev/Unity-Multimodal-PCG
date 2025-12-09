@@ -7,7 +7,7 @@ namespace PCG.Environment
 {
     public class MazeGenerator : IGeneratorStrategy
     {
-        static private readonly Vector2Int[] Directions = new Vector2Int[]
+        private static readonly Vector2Int[] Directions = new Vector2Int[]
         {
             new Vector2Int(0, 1),  // North
             new Vector2Int(0, -1), // South

@@ -7,6 +7,9 @@
     <list default="true" id="9793d3e9-fe30-41e0-9044-0ad29646b849" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Unity-Multimodal-PCG/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Unity-Multimodal-PCG/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Project/Core/PCGManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Core/PCGManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/Rendering/ProceduralMeshBuilder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Core/Rendering/ProceduralMeshBuilder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Environment/MazeGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Modules/Environment/MazeGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -21,6 +24,7 @@
     <setting file="file://$PROJECT_DIR$/Assets/Project/Core/IGeneratorStrategy.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Project/Core/MapData.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Project/Core/PCGManager.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Project/Core/SpawnData.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Project/Data/DebugConfig.asset" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
@@ -39,7 +43,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "feat/benchmark-stats-map-generation",
+    "git-widget-placeholder": "feat/entities-spawn-generation-data",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
     "node.js.detected.package.eslint": "true",
@@ -47,7 +51,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "settings.editor.selected.configurable": "preferences.sourceCode.C#",
     "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }
@@ -100,6 +104,7 @@
       <updated>1765122597286</updated>
       <workItem from="1765122604168" duration="1642000" />
       <workItem from="1765183788420" duration="4030000" />
+      <workItem from="1765300531407" duration="4463000" />
     </task>
     <servers />
   </component>

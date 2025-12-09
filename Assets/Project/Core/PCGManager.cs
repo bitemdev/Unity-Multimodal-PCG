@@ -3,6 +3,7 @@ using UnityEngine;
 using Unity.Collections;
 using PCG.Rendering;
 using System.Diagnostics;
+using Unity.Mathematics;
 
 namespace PCG.Core
 {
@@ -28,6 +29,7 @@ namespace PCG.Core
         [SerializeField] private MeshRenderer _meshRenderer;
 
         private MapData _currentMap;
+        private NativeList<SpawnPoint> _spawnPoints;
 
         // This method generates a level
         [ContextMenu("Generate Level")] // It allows to play from inspector without actually playing
@@ -36,6 +38,11 @@ namespace PCG.Core
             if (_currentMap.Grid.IsCreated) // If a map is already created, it shall be cleaned up to prevent memory leaks
             {
                 _currentMap.Dispose();
+            }
+
+            if (_spawnPoints.IsCreated)
+            {
+                _spawnPoints.Dispose();
             }
 
             if (_config == null)
@@ -51,6 +58,7 @@ namespace PCG.Core
             
             Vector2Int size = new Vector2Int(_config.Width, _config.Height);
             _currentMap = strategy.Generate(_config.Seed, size);
+            _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, Allocator.Persistent);
             
             long logicTime = sw.ElapsedMilliseconds; // Capturated logic time (array data generation time)
             
@@ -84,21 +92,29 @@ namespace PCG.Core
         // This method is called both when game's closed and scene's been changed. It is mandatory to clean up NativeArrays here
         private void OnDestroy()
         {
-            if (_currentMap.Grid.IsCreated)
-            {
-                _currentMap.Dispose();
-                UnityEngine.Debug.Log("Map memory cleaned.");
-            }
+            CleanMemory();
         }
         
         // This method is called when a script is deactivated or Unity is recompiling
         private void OnDisable()
         {
+            CleanMemory();
+        }
+
+        // This method cleans up every array and rubbish
+        private void CleanMemory()
+        {
             if (_currentMap.Grid.IsCreated)
             {
                 _currentMap.Dispose();
-                UnityEngine.Debug.Log("Map memory cleaned.");
             }
+
+            if (_spawnPoints.IsCreated)
+            {
+                _spawnPoints.Dispose();
+            }
+            
+            UnityEngine.Debug.Log("Map memory cleaned.");
         }
     }
 }
