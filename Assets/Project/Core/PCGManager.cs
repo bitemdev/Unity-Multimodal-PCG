@@ -4,6 +4,7 @@ using Unity.Collections;
 using PCG.Rendering;
 using System.Diagnostics;
 using Unity.Mathematics;
+using Unity.VisualScripting;
 
 namespace PCG.Core
 {
@@ -13,7 +14,7 @@ namespace PCG.Core
         Dungeon_BSP
     }
     
-    [DisallowMultipleComponent] // With this, only 1 manager per gameobject is allowed
+    [DisallowMultipleComponent] // With this, only 1 manager per GameObject is allowed
     public class PCGManager : MonoBehaviour
     {
         [Header("Dependencies")]
@@ -59,6 +60,14 @@ namespace PCG.Core
             Vector2Int size = new Vector2Int(_config.Width, _config.Height);
             _currentMap = strategy.Generate(_config.Seed, size);
             _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, Allocator.Persistent);
+            
+            MapAnalyzer.AppendEntities(
+                _currentMap, 
+                ref _spawnPoints, 
+                _config.EnemyCount, 
+                _config.ObjectCount, 
+                (uint)_config.Seed
+            );
             
             long logicTime = sw.ElapsedMilliseconds; // Captured logic time (array data generation time)
             
@@ -115,6 +124,41 @@ namespace PCG.Core
             }
             
             UnityEngine.Debug.Log("Map memory cleaned.");
+        }
+
+        // This method is called whenever the screen is generated, and it's a debug
+        private void OnDrawGizmos()
+        {
+            if (!_currentMap.Grid.IsCreated || !_spawnPoints.IsCreated)
+            {
+                return;
+            }
+
+            foreach (SpawnPoint point in _spawnPoints)
+            {
+                Vector3 pos = new Vector3(point.Coordinate.x, 2f, point.Coordinate.y);
+
+                if (point.Type == EntityType.Start)
+                {
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawSphere(pos, 0.5f);
+                }
+                else if (point.Type == EntityType.Exit)
+                {
+                    Gizmos.color = Color.magenta;
+                    Gizmos.DrawCube(pos, Vector3.one);
+                }
+                else if (point.Type == EntityType.Enemy)
+                {
+                    Gizmos.color = Color.red;
+                    Gizmos.DrawSphere(pos, 0.3f);
+                }
+                else if (point.Type == EntityType.Object)
+                {
+                    Gizmos.color = Color.yellow;
+                    Gizmos.DrawWireCube(pos, Vector3.one * 0.5f);
+                }
+            }
         }
     }
 }
