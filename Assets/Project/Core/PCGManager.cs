@@ -3,7 +3,9 @@ using UnityEngine;
 using Unity.Collections;
 using PCG.Rendering;
 using System.Diagnostics;
+using System;
 using Unity.Mathematics;
+using Unity.VisualScripting;
 
 namespace PCG.Core
 {
@@ -13,9 +15,11 @@ namespace PCG.Core
         Dungeon_BSP
     }
     
-    [DisallowMultipleComponent] // With this, only 1 manager per gameobject is allowed
+    [DisallowMultipleComponent] // With this, only 1 manager per GameObject is allowed
     public class PCGManager : MonoBehaviour
     {
+        public event Action<NativeList<SpawnPoint>> OnLevelGenerated;
+        
         [Header("Dependencies")]
         [Tooltip("Configuration file with base parameters.")]
         [SerializeField] private PCGConfiguration _config;
@@ -60,6 +64,14 @@ namespace PCG.Core
             _currentMap = strategy.Generate(_config.Seed, size);
             _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, Allocator.Persistent);
             
+            MapAnalyzer.FindCellCandidates(
+                _currentMap, 
+                ref _spawnPoints, 
+                _config.InitialEnemyCount, 
+                _config.InitialObjectCount, 
+                (uint)_config.Seed
+            );
+            
             long logicTime = sw.ElapsedMilliseconds; // Captured logic time (array data generation time)
             
             Mesh levelMesh = ProceduralMeshBuilder.BuildMesh(_currentMap);
@@ -68,6 +80,8 @@ namespace PCG.Core
             long renderTime = sw.ElapsedMilliseconds - logicTime; // Visual delta
     
             _meshFilter.mesh = levelMesh;
+            
+            OnLevelGenerated?.Invoke(_spawnPoints);
     
             string log = $"[PCG Stats] Map: {_config.Width}x{_config.Height} | ";
             log += $"Total: {sw.Elapsed.TotalMilliseconds:F2}ms (Logic: {logicTime}ms | Mesh: {renderTime}ms) | ";

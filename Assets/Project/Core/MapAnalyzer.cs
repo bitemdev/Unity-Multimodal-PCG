@@ -21,8 +21,8 @@ namespace PCG.Core
             int2 endNode = RunFloodFill(map, startNode, out int maxDistB); // From start, search for opposite point (exit)
 
             // Save results
-            results.Add(new SpawnPoint { Coordinate = startNode, Type = EntityType.Start });
-            results.Add(new SpawnPoint { Coordinate = endNode, Type = EntityType.Exit });
+            results.Add(new SpawnPoint { Coordinate = startNode, Type = EntityType.Start, RotationY = 0 });
+            results.Add(new SpawnPoint { Coordinate = endNode, Type = EntityType.Exit, RotationY = 0 });
 
             Debug.Log($"[MapAnalyzer] Maximum distance from start to exit: {maxDistB} steps.");
 
@@ -110,6 +110,91 @@ namespace PCG.Core
                 }
             }
             return new int2(-1, -1);
+        }
+        
+        // This method, given a seed, determines the possible cell candidates for objects + enemies to spawn
+        public static void FindCellCandidates(MapData map, ref NativeList<SpawnPoint> currentPoints, int enemyCount, int objectCount, uint seed, int safeZoneRadius = 5)
+        {
+            int2 startPosition = int2.zero;
+            bool startFound = false;
+            foreach (SpawnPoint p in currentPoints) // Identify the player's start position to create safety distance
+            {
+                if (p.Type == EntityType.Start)
+                {
+                    startPosition = p.Coordinate;
+                    startFound = true;
+                    break;
+                }
+            }
+
+            NativeList<int2> candidates = new NativeList<int2>(map.Grid.Length, Allocator.Temp); // Candidate cells where an entity can spawn
+
+            for (int i = 0; i < map.Grid.Length; i++)
+            {
+                if (map.Grid[i] == CellType.Floor)
+                {
+                    int2 pos = new int2(i % map.Width, i / map.Width);
+                    float distToPlayer = math.distance(pos, startPosition);
+                    
+                    bool overlapsExisting = false;
+                    if (startFound && distToPlayer < safeZoneRadius)
+                    {
+                        overlapsExisting = true;
+                    }
+                    
+                    if (!overlapsExisting)
+                    {
+                        foreach (SpawnPoint existing in currentPoints)
+                        {
+                            if (existing.Coordinate.Equals(pos)) // If it's at exit
+                            {
+                                overlapsExisting = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!overlapsExisting)
+                    {
+                        candidates.Add(pos);
+                    }
+                }
+            }
+
+            // Fisher-Yates Shuffle
+            Unity.Mathematics.Random rng = new Unity.Mathematics.Random(seed);
+            
+            for (int i = candidates.Length - 1; i > 0; i--)
+            {
+                int j = rng.NextInt(i + 1);
+                (candidates[i], candidates[j]) = (candidates[j], candidates[i]); // Swap C# tuple syntax
+            }
+
+            int count = 0;
+            
+            for (int i = 0; i < enemyCount && count < candidates.Length; i++) // Place enemies
+            {
+                currentPoints.Add(new SpawnPoint
+                {
+                    Coordinate = candidates[count],
+                    Type = EntityType.Enemy,
+                    RotationY = rng.NextFloat(0, 360)
+                });
+                count++;
+            }
+
+            for (int i = 0; i < objectCount && count < candidates.Length; i++) // Place objects
+            {
+                currentPoints.Add(new SpawnPoint
+                {
+                    Coordinate = candidates[count],
+                    Type = EntityType.Object,
+                    RotationY = rng.NextFloat(0, 360)
+                });
+                count++;
+            }
+
+            candidates.Dispose(); // Clean up memory
         }
     }
 }

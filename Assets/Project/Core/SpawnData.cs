@@ -6,6 +6,7 @@ namespace PCG.Core
     {
         public int2 Coordinate;
         public EntityType Type;
+        public float RotationY;
     }
 
     public enum EntityType
