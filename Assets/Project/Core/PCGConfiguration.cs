@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace PCG.Core
 {
-    [CreateAssetMenu(fileName = "NewPCGConfig", menuName = "PCG/Configuration")]
+    [CreateAssetMenu(fileName = "NewPCGConfig", menuName = "PCG/PCG Configuration")]
     public class PCGConfiguration : ScriptableObject
     {
         public int Seed => _seed;
