@@ -8,8 +8,8 @@ namespace PCG.Core
         public int Seed => _seed;
         public int Width => _width;
         public int Height => _height;
-        public int EnemyCount => _enemyCount;
-        public int ObjectCount => _objectCount;
+        public int InitialEnemyCount => _initialEnemyCount;
+        public int InitialObjectCount => _initialObjectCount;
         
         [Header("General Settings")]
         [SerializeField] private int _seed;
@@ -19,7 +19,7 @@ namespace PCG.Core
         [SerializeField, Range(10, 500)] private int _height = 50;
         
         [Header("Entities")] 
-        [SerializeField] private int _enemyCount = 10;
-        [SerializeField] private int _objectCount = 6;
+        [SerializeField] private int _initialEnemyCount = 10;
+        [SerializeField] private int _initialObjectCount = 6;
     }
 }

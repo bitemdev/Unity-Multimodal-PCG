@@ -21,8 +21,8 @@ namespace PCG.Core
             int2 endNode = RunFloodFill(map, startNode, out int maxDistB); // From start, search for opposite point (exit)
 
             // Save results
-            results.Add(new SpawnPoint { Coordinate = startNode, Type = EntityType.Start });
-            results.Add(new SpawnPoint { Coordinate = endNode, Type = EntityType.Exit });
+            results.Add(new SpawnPoint { Coordinate = startNode, Type = EntityType.Start, RotationY = 0 });
+            results.Add(new SpawnPoint { Coordinate = endNode, Type = EntityType.Exit, RotationY = 0 });
 
             Debug.Log($"[MapAnalyzer] Maximum distance from start to exit: {maxDistB} steps.");
 
@@ -113,7 +113,7 @@ namespace PCG.Core
         }
         
         // This method, given a seed, determines the possible cell candidates for objects + enemies to spawn
-        public static void AppendEntities(MapData map, ref NativeList<SpawnPoint> currentPoints, int enemyCount, int lootCount, uint seed, int safeZoneRadius = 5)
+        public static void FindCellCandidates(MapData map, ref NativeList<SpawnPoint> currentPoints, int enemyCount, int objectCount, uint seed, int safeZoneRadius = 5)
         {
             int2 startPosition = int2.zero;
             bool startFound = false;
@@ -177,17 +177,19 @@ namespace PCG.Core
                 currentPoints.Add(new SpawnPoint
                 {
                     Coordinate = candidates[count],
-                    Type = EntityType.Enemy
+                    Type = EntityType.Enemy,
+                    RotationY = rng.NextFloat(0, 360)
                 });
                 count++;
             }
 
-            for (int i = 0; i < lootCount && count < candidates.Length; i++) // Place objects
+            for (int i = 0; i < objectCount && count < candidates.Length; i++) // Place objects
             {
                 currentPoints.Add(new SpawnPoint
                 {
                     Coordinate = candidates[count],
-                    Type = EntityType.Object
+                    Type = EntityType.Object,
+                    RotationY = rng.NextFloat(0, 360)
                 });
                 count++;
             }

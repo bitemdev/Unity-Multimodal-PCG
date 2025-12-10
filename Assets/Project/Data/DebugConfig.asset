@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00a383da7b1daf647b4e30c30dc0ea95, type: 3}
   m_Name: DebugConfig
   m_EditorClassIdentifier: 
-  _seed: 15545464
+  _seed: 5454
   _width: 301
   _height: 301
-  _enemyCount: 40
-  _objectCount: 20
+  _initialEnemyCount: 40
+  _initialObjectCount: 25
