@@ -60,7 +60,7 @@ namespace PCG.Core
             _currentMap = strategy.Generate(_config.Seed, size);
             _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, Allocator.Persistent);
             
-            long logicTime = sw.ElapsedMilliseconds; // Capturated logic time (array data generation time)
+            long logicTime = sw.ElapsedMilliseconds; // Captured logic time (array data generation time)
             
             Mesh levelMesh = ProceduralMeshBuilder.BuildMesh(_currentMap);
             
