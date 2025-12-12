@@ -6,13 +6,78 @@
   <component name="ChangeListManager">
     <list default="true" id="9793d3e9-fe30-41e0-9044-0ad29646b849" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Unity-Multimodal-PCG/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Unity-Multimodal-PCG/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/PCGConfiguration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Core/PCGConfiguration.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Data/DebugConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Data/DebugConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Game.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Game/EntityManager.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Game/EntityManager.cs.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Black.mat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Black.mat.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Green.mat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Green.mat.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Purple.mat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Purple.mat.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Red.mat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Materials/Red.mat.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Shaders.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Shaders/DebugVertexColor.shadergraph" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Shaders/DebugVertexColor.shadergraph.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Shaders/Mat_DebugLevel.mat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Art/Shaders/Mat_DebugLevel.mat.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Common.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/AudioConfiguration.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/AudioConfiguration.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/CellType.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/CellType.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/EntityPool.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/EntityPool.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/IGeneratorStrategy.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/IGeneratorStrategy.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/MapAnalyzer.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/MapAnalyzer.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/MapData.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/MapData.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/PCGConfiguration.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/PCGConfiguration.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/PCGManager.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/PCGManager.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/Rendering.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/Rendering/ProceduralMeshBuilder.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/Rendering/ProceduralMeshBuilder.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/SpawnData.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Core/SpawnData.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Data.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Data/DebugAudioConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Data/DebugAudioConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Data/DebugPCGConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Data/DebugPCGConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Editor.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Audio.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Audio/MusicGenerator.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Audio/MusicGenerator.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Audio/ProceduralAudioSource.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Audio/ProceduralAudioSource.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Entities.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Entities/EntityManager.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Entities/EntityManager.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Environment.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Environment/DungeonGenerator.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Environment/DungeonGenerator.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Environment/MazeGenerator.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Environment/MazeGenerator.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Modules/Tools.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Enemy.prefab" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Enemy.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Exit.prefab" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Exit.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Object.prefab" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Object.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Player.prefab" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Prefabs/Player.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Scenes.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Project/Scenes/PCG_Sandbox.unity.meta" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,7 +111,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "feat/base-audio-generation",
+    "git-widget-placeholder": "refactor/optimise-scripts-structure",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
     "node.js.detected.package.eslint": "true",
@@ -54,7 +119,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "editor.preferences.import",
+    "settings.editor.selected.configurable": "preferences.editor",
     "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }
@@ -109,6 +174,7 @@
       <workItem from="1765183788420" duration="4030000" />
       <workItem from="1765300531407" duration="4463000" />
       <workItem from="1765365834486" duration="13568000" />
+      <workItem from="1765553798835" duration="2846000" />
     </task>
     <servers />
   </component>
