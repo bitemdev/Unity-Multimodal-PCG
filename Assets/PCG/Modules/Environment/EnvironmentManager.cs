@@ -151,18 +151,18 @@ namespace PCG.Modules.Environment
 
         private void OnDestroy()
         {
-            CleanMemory();
+            ClearMemory();
         }
         
         private void OnDisable()
         {
-            CleanMemory();
+            ClearMemory();
         }
 
         /// <summary>
         /// This method cleans up every array and rubbish
         /// </summary>
-        private void CleanMemory()
+        public void ClearMemory()
         {
             if (_currentMap.Grid.IsCreated)
             {
