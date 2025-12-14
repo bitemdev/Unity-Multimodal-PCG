@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00a383da7b1daf647b4e30c30dc0ea95, type: 3}
   m_Name: DebugPCGConfig
   m_EditorClassIdentifier: 
-  _seed: 687675
+  _seed: 2147483647
   _width: 500
   _height: 500
-  _initialEnemyCount: 50
-  _initialObjectCount: 50
+  _initialEnemyCount: 100
+  _initialObjectCount: 80
   _bpm: 120
   _pentatonicScale:
   - 65.41
