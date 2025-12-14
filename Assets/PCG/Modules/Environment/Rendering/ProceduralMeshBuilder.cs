@@ -12,17 +12,25 @@ namespace PCG.Modules.Environment.Rendering
         private const float CellSize = 1.0f;
         
         // Debug colors
-         private static readonly Color WallColor = new Color(0f, 0.121f, 0.247f);
-         private static readonly Color FloorColor = new Color(0.968f, 0.905f, 0.807f);
+        private static readonly Color WallColor = new Color(0f, 0.121f, 0.247f);
+        private static readonly Color FloorColor = new Color(0.968f, 0.905f, 0.807f);
+
+        // Auxiliary class to help manage every mesh list
+        private class MeshBuffer
+        {
+            public List<Vector3> Vertices = new List<Vector3>();
+            public List<int> Triangles = new List<int>();
+            public List<Color> Colors = new List<Color>();
+        }
         
         /// <summary>
-        /// This method generates an optimised mesh based on MapData
+        /// This method generates two optimised meshes based on MapData (one for the walkable floor, and the rest).
         /// </summary>
-        public static Mesh BuildMesh(MapData map)
+        /// <param name="map"></param>
+        public static (Mesh floorMesh, Mesh wallMesh) BuildMesh(MapData map)
         {
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            List<Color> colors = new List<Color>();
+            MeshBuffer floorBuffer = new MeshBuffer();
+            MeshBuffer wallBuffer = new MeshBuffer();
             
             for (int x = 0; x < map.Width; x++)
             {
@@ -31,36 +39,50 @@ namespace PCG.Modules.Environment.Rendering
                     int index = map.GetIndex(x, y);
                     CellType currentCell = map.Grid[index];
 
-                    if (currentCell == CellType.Empty) // If cell empty, go to next one (CPU saving)
+                    if (currentCell == CellType.Empty)
                     {
                         continue;
                     }
 
                     Vector3 pos = new Vector3(x * CellSize, 0, y * CellSize);
                     
-                    BuildCell(x, y, currentCell, pos, map, vertices, triangles, colors);
+                    BuildCell(x, y, currentCell, pos, map, floorBuffer, wallBuffer);
                 }
             }
 
-            Mesh mesh = new Mesh(); // Final mesh
-            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32; // This allows more than 65k vertices, for big maps
+            return (CreateMeshFromBuffer(floorBuffer), CreateMeshFromBuffer(wallBuffer));
+        }
+        
+        /// <summary>
+        /// This method creates an optimised mesh based on a mesh list buffer.
+        /// </summary>
+        /// <param name="buffer"></param>
+        private static Mesh CreateMeshFromBuffer(MeshBuffer buffer)
+        {
+            Mesh mesh = new Mesh();
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             
-            // It used normal Lists because the mesh builder only accepts these, and since it is only created at the very beginning, it is okay to wait for the C# garbage collector
-            mesh.vertices = vertices.ToArray();
-            mesh.triangles = triangles.ToArray();
-            mesh.colors = colors.ToArray();
+            mesh.vertices = buffer.Vertices.ToArray();
+            mesh.triangles = buffer.Triangles.ToArray();
+            mesh.colors = buffer.Colors.ToArray();
             
-            // Calculate normals for the light
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-
+            
             return mesh;
         }
 
         /// <summary>
-        /// This method generates a single cell based on its info
+        /// This method generates a single cell based on its info.
         /// </summary>
-        private static void BuildCell(int x, int y, CellType type, Vector3 pos, MapData map, List<Vector3> verts, List<int> tris, List<Color> colors)
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="type"></param>
+        /// <param name="pos"></param>
+        /// <param name="map"></param>
+        /// <param name="floorBuffer"></param>
+        /// <param name="wallBuffer"></param>
+        private static void BuildCell(int x, int y, CellType type, Vector3 pos, MapData map, MeshBuffer floorBuffer, MeshBuffer wallBuffer)
         {
             float height = (type == CellType.Wall) ? WallHeight : FloorHeight; // If it's wall then WallHeight, otherwise it's floor minimum height
             float yCenter = (type == CellType.Wall) ? WallHeight / 2 : FloorHeight / 2;
@@ -73,64 +95,63 @@ namespace PCG.Modules.Environment.Rendering
             float hy = size.y * 0.5f;
             float hz = size.z * 0.5f;
 
-            if (ShouldDrawFace(x, y + 1, type, map)) // Z+ Face culling
+            // Faces always go to wallBuffer
+            if (ShouldDrawFace(x, y + 1, type, map)) // Z+ Face Culling
             {
-                // Clockwise
-                AddQuad(verts, tris, colors, cellColor, 
-                    center + new Vector3(hx, hy, hz),   // Top Right (2)
-                    center + new Vector3(-hx, hy, hz),  // Top Left (3)
-                    center + new Vector3(-hx, -hy, hz), // Bottom Left (7)
-                    center + new Vector3(hx, -hy, hz)   // Bottom Right (6)
-                );
+                AddQuad(wallBuffer, WallColor, 
+                    center + new Vector3(hx, hy, hz),
+                    center + new Vector3(-hx, hy, hz),
+                    center + new Vector3(-hx, -hy, hz),
+                    center + new Vector3(hx, -hy, hz));
             }
 
-            if (ShouldDrawFace(x, y - 1, type, map)) // Z- Face culling
+            if (ShouldDrawFace(x, y - 1, type, map)) // Z- Face Culling
             {
-                // Clockwise
-                AddQuad(verts, tris, colors, cellColor,
-                    center + new Vector3(-hx, hy, -hz), // Top Left (0)
-                    center + new Vector3(hx, hy, -hz),  // Top Right (1)
-                    center + new Vector3(hx, -hy, -hz), // Bottom Right (5)
-                    center + new Vector3(-hx, -hy, -hz) // Bottom Left (4)
-                );
+                AddQuad(wallBuffer, WallColor, 
+                    center + new Vector3(-hx, hy, -hz),
+                    center + new Vector3(hx, hy, -hz),
+                    center + new Vector3(hx, -hy, -hz),
+                    center + new Vector3(-hx, -hy, -hz));
             }
 
-            if (ShouldDrawFace(x + 1, y, type, map)) // X+ Face culling
+            if (ShouldDrawFace(x + 1, y, type, map)) // X+ Face Culling
             {
-                // Clockwise
-                AddQuad(verts, tris, colors, cellColor,
-                    center + new Vector3(hx, hy, -hz),  // Top Left (1)
-                    center + new Vector3(hx, hy, hz),   // Top Right (2)
-                    center + new Vector3(hx, -hy, hz),  // Bottom Right (6)
-                    center + new Vector3(hx, -hy, -hz)  // Bottom Left (5)
-                );
+                AddQuad(wallBuffer, WallColor, 
+                    center + new Vector3(hx, hy, -hz),
+                    center + new Vector3(hx, hy, hz),
+                    center + new Vector3(hx, -hy, hz),
+                    center + new Vector3(hx, -hy, -hz));
             }
 
-            if (ShouldDrawFace(x - 1, y, type, map)) // X- Face culling
+            if (ShouldDrawFace(x - 1, y, type, map)) // X- Face Culling
             {
-                // Clockwise
-                AddQuad(verts, tris, colors, cellColor,
-                    center + new Vector3(-hx, hy, hz),  // Top Left (3)
-                    center + new Vector3(-hx, hy, -hz), // Top Right (0)
-                    center + new Vector3(-hx, -hy, -hz),// Bottom Right (4)
-                    center + new Vector3(-hx, -hy, hz)  // Bottom Left (7)
-                );
+                AddQuad(wallBuffer, WallColor, 
+                    center + new Vector3(-hx, hy, hz),
+                    center + new Vector3(-hx, hy, -hz),
+                    center + new Vector3(-hx, -hy, -hz),
+                    center + new Vector3(-hx, -hy, hz));
             }
+
+            MeshBuffer targetBuffer = type == CellType.Wall ? wallBuffer : floorBuffer;
 
             // Y+ is always rendered
-            AddQuad(verts, tris, colors, cellColor,
-                center + new Vector3(-hx, hy, hz),  // 3
-                center + new Vector3(hx, hy, hz),   // 2
-                center + new Vector3(hx, hy, -hz),  // 1
-                center + new Vector3(-hx, hy, -hz)  // 0
+            AddQuad(targetBuffer, cellColor,
+                center + new Vector3(-hx, hy, hz),
+                center + new Vector3(hx, hy, hz),
+                center + new Vector3(hx, hy, -hz),
+                center + new Vector3(-hx, hy, -hz)
             );
 
             // Y- is never rendered
         }
 
         /// <summary>
-        /// This method determines whether a face should be rendered or not based on optimisation rules
+        /// This method determines whether a face should be rendered or not based on optimisation rules.
         /// </summary>
+        /// <param name="neighborX"></param>
+        /// <param name="neighborY"></param>
+        /// <param name="currentType"></param>
+        /// <param name="map"></param>
         private static bool ShouldDrawFace(int neighborX, int neighborY, CellType currentType, MapData map)
         {
             if (neighborX < 0 || neighborX >= map.Width || neighborY < 0 || neighborY >= map.Height) // If neighbour is out of the map, it's a border -> DRAW
@@ -155,32 +176,35 @@ namespace PCG.Modules.Environment.Rendering
         }
 
         /// <summary>
-        /// This method generates faces
+        /// This method generates faces.
         /// </summary>
-        private static void AddQuad(List<Vector3> verts, List<int> tris, List<Color> colors, Color c, Vector3 tl, Vector3 tr, Vector3 br, Vector3 bl)
+        /// <param name="buffer"></param>
+        /// <param name="c"></param>
+        /// <param name="tl"></param>
+        /// <param name="tr"></param>
+        /// <param name="br"></param>
+        /// <param name="bl"></param>
+        private static void AddQuad(MeshBuffer buffer, Color c, Vector3 tl, Vector3 tr, Vector3 br, Vector3 bl)
         {
-            int index = verts.Count;
+            int index = buffer.Vertices.Count;
             
-            // 4 vertices
-            verts.Add(tl);
-            verts.Add(tr);
-            verts.Add(br);
-            verts.Add(bl);
+            buffer.Vertices.Add(tl);
+            buffer.Vertices.Add(tr);
+            buffer.Vertices.Add(br);
+            buffer.Vertices.Add(bl);
             
-            colors.Add(c);
-            colors.Add(c);
-            colors.Add(c);
-            colors.Add(c);
+            buffer.Colors.Add(c);
+            buffer.Colors.Add(c);
+            buffer.Colors.Add(c);
+            buffer.Colors.Add(c);
 
-            // First triangle
-            tris.Add(index + 0);
-            tris.Add(index + 1);
-            tris.Add(index + 2);
+            buffer.Triangles.Add(index + 0);
+            buffer.Triangles.Add(index + 1);
+            buffer.Triangles.Add(index + 2);
             
-            // Second triangle
-            tris.Add(index + 0);
-            tris.Add(index + 2);
-            tris.Add(index + 3);
+            buffer.Triangles.Add(index + 0);
+            buffer.Triangles.Add(index + 2);
+            buffer.Triangles.Add(index + 3);
         }
     }
 }
