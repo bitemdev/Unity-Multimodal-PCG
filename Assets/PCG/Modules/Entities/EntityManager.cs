@@ -46,29 +46,66 @@ namespace PCG.Modules.Entities
 
             foreach (SpawnPoint point in spawnPoints)
             {
-                Vector3 position = new Vector3(point.Coordinate.x, 0, point.Coordinate.y);
+                Vector3 basePosition = new Vector3(point.Coordinate.x, 0, point.Coordinate.y);
                 Quaternion rotation = Quaternion.Euler(0, point.RotationY, 0);
 
                 switch (point.Type)
                 {
                     case EntityType.Start:
-                        PlacePlayer(position, rotation);
+                        PlacePlayer(basePosition, rotation);
+                        break;
+                    case EntityType.Exit:
+                        PlaceExit(basePosition, rotation);
                         break;
                     case EntityType.Enemy:
                         GameObject enemy = _enemyPool.Get();
-                        enemy.transform.position = position;
+                        enemy.transform.position = AdjustYPosition(enemy, basePosition);
                         enemy.transform.rotation = rotation;
                         break;
                     case EntityType.Object:
                         GameObject obj = _objectPool.Get();
-                        obj.transform.position = position;
+                        obj.transform.position = AdjustYPosition(obj, basePosition);
                         obj.transform.rotation = rotation;
-                        break;
-                    case EntityType.Exit:
-                        PlaceExit(position, rotation);
                         break;
                 }
             }
+        }
+        
+        /// <summary>
+        /// This method calculates the correct Y position so the object rests perfectly on the floor, regardless of where its Pivot is (Center or Feet).
+        /// </summary>
+        private Vector3 AdjustYPosition(GameObject entity, Vector3 gridPosition)
+        {
+            float actualFloorY = 0f;
+    
+            RaycastHit hit;
+            Vector3 origin = new Vector3(gridPosition.x, 10f, gridPosition.z);
+    
+            if (Physics.Raycast(origin, Vector3.down, out hit, 20f))
+            {
+                actualFloorY = hit.point.y;
+            }
+            else
+            {
+                actualFloorY = 0.2f; 
+            }
+
+            float pivotOffset = 0f;
+            Collider col = entity.GetComponent<Collider>();
+    
+            if (col != null)
+            {
+                Physics.SyncTransforms(); // Force physics update, just in case
+        
+                float distPivotToBottom = entity.transform.position.y - col.bounds.min.y;
+
+                if (distPivotToBottom > 0)
+                {
+                    pivotOffset = distPivotToBottom;
+                }
+            }
+
+            return new Vector3(gridPosition.x, actualFloorY + pivotOffset + 0.001f, gridPosition.z);
         }
 
         /// <summary>
@@ -90,6 +127,7 @@ namespace PCG.Modules.Entities
                 }
 
                 _currentPlayer.transform.position = position;
+                _currentPlayer.transform.position = AdjustYPosition(_currentPlayer, position);
                 _currentPlayer.transform.rotation = rotation;
                 
                 if (characterController)
@@ -108,11 +146,9 @@ namespace PCG.Modules.Entities
             {
                 _currentExit = Instantiate(_exitPrefab, position, rotation);
             }
-            else
-            {
-                _currentExit.transform.position = position;
-                _currentExit.transform.rotation = rotation;
-            }
+            
+            _currentExit.transform.position = AdjustYPosition(_currentExit, position);
+            _currentExit.transform.rotation = rotation;
         }
     }
 }
