@@ -10,6 +10,9 @@ namespace PCG.Modules.Entities
         [Header("References")] 
         [SerializeField] private EnvironmentManager _environmentManager;
 
+        [Header("Manual Offsets")]
+        [SerializeField] private float _globalHeightOffset = 0.0f;
+
         [Header("Prefabs / Pools")] 
         [SerializeField] private GameObject _playerPrefab;
         [SerializeField] private GameObject _exitPrefab;
@@ -36,11 +39,11 @@ namespace PCG.Modules.Entities
         }
 
         /// <summary>
-        /// This method repositions every entity at the start of the level
+        /// This method runs when the level is generated. It spawns all the entities
         /// </summary>
+        /// <param name="spawnPoints"></param>
         private void OnLevelGeneratedHandler(NativeList<SpawnPoint> spawnPoints)
         {
-            // Clean previous
             _enemyPool.DeactivateAll();
             _objectPool.DeactivateAll();
 
@@ -54,92 +57,44 @@ namespace PCG.Modules.Entities
                     case EntityType.Start:
                         PlacePlayer(basePosition, rotation);
                         break;
+
                     case EntityType.Exit:
                         PlaceExit(basePosition, rotation);
                         break;
+
                     case EntityType.Enemy:
                         GameObject enemy = _enemyPool.Get();
-                        enemy.transform.position = AdjustYPosition(enemy, basePosition);
-                        enemy.transform.rotation = rotation;
+                        PlaceAndAdjust(enemy, basePosition, rotation);
                         break;
+
                     case EntityType.Object:
                         GameObject obj = _objectPool.Get();
-                        obj.transform.position = AdjustYPosition(obj, basePosition);
-                        obj.transform.rotation = rotation;
+                        PlaceAndAdjust(obj, basePosition, rotation);
                         break;
                 }
             }
         }
-        
-        /// <summary>
-        /// This method calculates the correct Y position so the object rests perfectly on the floor, regardless of where its Pivot is (Center or Feet).
-        /// </summary>
-        private Vector3 AdjustYPosition(GameObject entity, Vector3 gridPosition)
-        {
-            float actualFloorY = 0f;
-    
-            RaycastHit hit;
-            Vector3 origin = new Vector3(gridPosition.x, 10f, gridPosition.z);
-    
-            if (Physics.Raycast(origin, Vector3.down, out hit, 20f))
-            {
-                actualFloorY = hit.point.y;
-            }
-            else
-            {
-                actualFloorY = 0.2f; 
-            }
-
-            float pivotOffset = 0f;
-            Collider col = entity.GetComponent<Collider>();
-    
-            if (col != null)
-            {
-                Physics.SyncTransforms(); // Force physics update, just in case
-        
-                float distPivotToBottom = entity.transform.position.y - col.bounds.min.y;
-
-                if (distPivotToBottom > 0)
-                {
-                    pivotOffset = distPivotToBottom;
-                }
-            }
-
-            return new Vector3(gridPosition.x, actualFloorY + pivotOffset + 0.001f, gridPosition.z);
-        }
 
         /// <summary>
-        /// This method instantiates/places the player once the level is generated
+        /// This method is an auxiliary one which simply spawns the player
         /// </summary>
+        /// <param name="position"></param>
+        /// <param name="rotation"></param>
         private void PlacePlayer(Vector3 position, Quaternion rotation)
         {
             if (_currentPlayer == null)
             {
                 _currentPlayer = Instantiate(_playerPrefab, position, rotation);
             }
-            else
-            {
-                CharacterController characterController = _currentPlayer.GetComponent<CharacterController>();
-
-                if (characterController) // If player has CharacterController, it needs to be inactive in order to tp it
-                {
-                    characterController.enabled = false;
-                }
-
-                _currentPlayer.transform.position = position;
-                _currentPlayer.transform.position = AdjustYPosition(_currentPlayer, position);
-                _currentPlayer.transform.rotation = rotation;
-                
-                if (characterController)
-                {
-                    characterController.enabled = true;
-                }
-            }
+            
+            PlaceAndAdjust(_currentPlayer, position, rotation);
         }
         
         /// <summary>
-        /// This method instantiates/places the exit once the level is generated
+        /// This method is an auxiliary one which simply spawns the exit
         /// </summary>
+        /// <param name="position"></param>
+        /// <param name="rotation"></param>
         private void PlaceExit(Vector3 position, Quaternion rotation)
         {
             if (_currentExit == null)
@@ -147,8 +102,39 @@ namespace PCG.Modules.Entities
                 _currentExit = Instantiate(_exitPrefab, position, rotation);
             }
             
-            _currentExit.transform.position = AdjustYPosition(_currentExit, position);
-            _currentExit.transform.rotation = rotation;
+            PlaceAndAdjust(_currentExit, position, rotation);
+        }
+
+        /// <summary>
+        /// This method is an auxiliary one which helps position the entities correctly above the floor
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <param name="targetPos"></param>
+        /// <param name="rotation"></param>
+        private void PlaceAndAdjust(GameObject entity, Vector3 targetPos, Quaternion rotation)
+        {
+            // Temporarily at 0
+            entity.transform.position = targetPos;
+            entity.transform.rotation = rotation;
+
+            Collider col = entity.GetComponent<Collider>();
+            
+            if (col == null)
+            {
+                col = entity.GetComponentInChildren<Collider>(); // If no collider, it searches within its children
+            }
+
+            if (col != null)
+            {
+                Physics.SyncTransforms(); // Force update physics just in case
+
+                float bottomY = col.bounds.min.y; // The minimum point
+
+                // It calculates the remaining difference to 0
+                float offsetToGround = 0f - bottomY;
+
+                entity.transform.position += new Vector3(0, offsetToGround + _globalHeightOffset, 0); // Apply
+            }
         }
     }
 }

@@ -7,6 +7,13 @@ namespace PCG.Core
         public int2 Coordinate;
         public EntityType Type;
         public float RotationY;
+        
+        public SpawnPoint(int2 coordinate, EntityType type, float rotationY)
+        {
+            Coordinate = coordinate;
+            Type = type;
+            RotationY = rotationY;
+        }
     }
 
     public enum EntityType
