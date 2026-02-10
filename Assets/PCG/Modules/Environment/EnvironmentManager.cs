@@ -33,6 +33,7 @@ namespace PCG.Modules.Environment
         [Header("Visualization - Floor")]
         [SerializeField] private MeshFilter _floorMeshFilter;
         [SerializeField] private MeshRenderer _floorMeshRenderer;
+        [SerializeField] private MeshCollider _floorMeshCollider;
         [Tooltip("If no material is assigned, it will use a debug color.")]
         [SerializeField] private Material _floorMaterial;
         
@@ -74,15 +75,7 @@ namespace PCG.Modules.Environment
             
             Vector2Int size = new Vector2Int(_config.Width, _config.Height);
             _currentMap = strategy.Generate(_config.Seed, size);
-            _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, Allocator.Persistent);
-            
-            MapAnalyzer.FindCellCandidates(
-                _currentMap, 
-                ref _spawnPoints, 
-                _config.InitialEnemyCount, 
-                _config.InitialObjectCount, 
-                (uint)_config.Seed
-            );
+            _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, _config.InitialEnemyCount, _config.InitialObjectCount, Allocator.Persistent);
             
             long logicTime = sw.ElapsedMilliseconds; // Captured logic time (array data generation time)
             
@@ -93,6 +86,13 @@ namespace PCG.Modules.Environment
     
             AssignMesh(_floorMeshFilter, _floorMeshRenderer, floorMesh, _floorMaterial, "PCG_Floor");
             AssignMesh(_wallsMeshFilter, _wallsMeshRenderer, wallMesh, _wallsMaterial, "Default");
+            
+            if (_floorMeshCollider != null)
+            {
+                _floorMeshCollider.sharedMesh = floorMesh;
+            }
+            
+            Physics.SyncTransforms();
 
             if (_navMeshBuilder != null)
             {
@@ -265,6 +265,16 @@ namespace PCG.Modules.Environment
             if (_spawnPoints.IsCreated)
             {
                 _spawnPoints.Dispose();
+            }
+
+            if (_floorMeshFilter.mesh != null)
+            {
+                DestroyImmediate(_floorMeshFilter.mesh);
+            }
+
+            if (_wallsMeshFilter.mesh != null)
+            {
+                DestroyImmediate(_wallsMeshFilter.mesh);
             }
             
             UnityEngine.Debug.Log("Map memory cleaned.");

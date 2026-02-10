@@ -372,6 +372,7 @@ MonoBehaviour:
   _algorithmType: 1
   _floorMeshFilter: {fileID: 1542772592}
   _floorMeshRenderer: {fileID: 1542772591}
+  _floorMeshCollider: {fileID: 1542772590}
   _floorMaterial: {fileID: 2100000, guid: bfe3a46475c005a4b8ba5c1c09dbc31c, type: 2}
   _wallsMeshFilter: {fileID: 2051417192}
   _wallsMeshRenderer: {fileID: 2051417189}
@@ -655,6 +656,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _environmentManager: {fileID: 793826266}
+  _globalHeightOffset: 0.2
   _playerPrefab: {fileID: 9167418214615276094, guid: 8eee3e52d120ecf4382d69d85ff5714b, type: 3}
   _exitPrefab: {fileID: 8472238023683313883, guid: 18c2ac8e5f544b34586826e6a91c6535, type: 3}
   _enemyPool: {fileID: 450544253}

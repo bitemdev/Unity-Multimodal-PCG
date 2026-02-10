@@ -1,233 +1,232 @@
-using PCG.Core;
+using UnityEngine;
 using Unity.Collections;
 using Unity.Mathematics;
-using UnityEngine;
+using PCG.Core;
 
 namespace PCG.Modules.Environment
 {
     public static class MapAnalyzer
     {
         /// <summary>
-        /// This method implements an optimised 2-Pass BFS, assuring the maximum playability as the spawn and the exit are in opposite positions. It returns an optimised list containing the player spawn point and the exit
+        /// This method analyses the map and gets the optimal spawn points to ensure good playability
         /// </summary>
-        public static NativeList<SpawnPoint> GetOptimalSpawnPoints(MapData map, Allocator allocator)
+        /// <param name="map"></param>
+        /// <param name="enemyCount"></param>
+        /// <param name="objectCount"></param>
+        /// <param name="allocator"></param>
+        /// <returns></returns>
+        public static NativeList<SpawnPoint> GetOptimalSpawnPoints(MapData map, int enemyCount, int objectCount, Allocator allocator)
         {
             NativeList<SpawnPoint> results = new NativeList<SpawnPoint>(allocator);
+            
+            // Search for far away start and exit points
+            var endPoints = GetStartAndExit(map);
+            int2 startPos = endPoints.start;
+            int2 exitPos = endPoints.exit;
 
-            int2 randomFloor = FindFirstFloor(map); // Random floor to start, better if it's the centre
-            if (randomFloor.x == -1) // No map
+            results.Add(new SpawnPoint(startPos, EntityType.Start, 0));
+            results.Add(new SpawnPoint(exitPos, EntityType.Exit, 0));
+
+            // Occupied positions to ensure not to overlap
+            NativeList<int2> occupiedPositions = new NativeList<int2>(allocator);
+            occupiedPositions.Add(startPos);
+            occupiedPositions.Add(exitPos);
+            
+            NativeList<int2> deadEnds = GetDeadEnds(map, allocator);
+            
+            // Objects placement
+            int itemsPlaced = 0;
+            
+            // Try to place at dead-ends (as they are the best positions)
+            foreach (int2 deadEnd in deadEnds)
             {
-                return results;
+                if (itemsPlaced >= objectCount)
+                {
+                    break;
+                }
+
+                if (IsOccupied(deadEnd, occupiedPositions))
+                {
+                    continue;
+                }
+
+                results.Add(new SpawnPoint(deadEnd, EntityType.Object, 0));
+                occupiedPositions.Add(deadEnd);
+                itemsPlaced++;
+            }
+            
+            // If there are no dead-ends, place anywhere
+            if (itemsPlaced < objectCount)
+            {
+                NativeList<int2> allFloors = GetFreeFloorCells(map, occupiedPositions, allocator);
+                Shuffle(allFloors);
+
+                int fallbackIndex = 0;
+                while (itemsPlaced < objectCount && fallbackIndex < allFloors.Length)
+                {
+                    int2 pos = allFloors[fallbackIndex];
+                    results.Add(new SpawnPoint(pos, EntityType.Object, 0));
+                    occupiedPositions.Add(pos);
+                    itemsPlaced++;
+                    fallbackIndex++;
+                }
+                allFloors.Dispose();
             }
 
-            int2 startNode = RunFloodFill(map, randomFloor, out int maxDistA); // Search for the start
-            int2 endNode = RunFloodFill(map, startNode, out int maxDistB); // From start, search for opposite point (exit)
+            // Enemies placement
+            NativeList<int2> enemyCandidates = GetFreeFloorCells(map, occupiedPositions, allocator);
+            Shuffle(enemyCandidates);
 
-            // Save results
-            results.Add(new SpawnPoint { Coordinate = startNode, Type = EntityType.Start, RotationY = 0 });
-            results.Add(new SpawnPoint { Coordinate = endNode, Type = EntityType.Exit, RotationY = 0 });
+            int enemiesPlaced = 0;
+            for (int i = 0; i < enemyCandidates.Length; i++)
+            {
+                if (enemiesPlaced >= enemyCount)
+                {
+                    break;
+                }
 
-            Debug.Log($"[MapAnalyzer] Maximum distance from start to exit: {maxDistB} steps.");
+                int2 pos = enemyCandidates[i];
+                
+                float randomRot = UnityEngine.Random.Range(0, 4) * 90f;
+                results.Add(new SpawnPoint(pos, EntityType.Enemy, randomRot));
+                enemiesPlaced++;
+            }
+
+            deadEnds.Dispose();
+            occupiedPositions.Dispose();
+            enemyCandidates.Dispose();
 
             return results;
         }
+        
+        /// <summary>
+        /// This method is a helper one which returns whether a position is occupied or not
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="occupied"></param>
+        /// <returns></returns>
+        private static bool IsOccupied(int2 pos, NativeList<int2> occupied)
+        {
+            for (int i = 0; i < occupied.Length; i++)
+            {
+                if (occupied[i].Equals(pos))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         /// <summary>
-        /// This method runs an optimised version of BFS, returning both the farthest point and the distance it takes to go from start till there
+        /// This method is a helper one which returns all the dead-ends within the map
         /// </summary>
-        private static int2 RunFloodFill(MapData map, int2 startPos, out int maxDistanceFound)
+        /// <param name="map"></param>
+        /// <param name="allocator"></param>
+        /// <returns></returns>
+        private static NativeList<int2> GetDeadEnds(MapData map, Allocator allocator)
         {
-            NativeArray<int> distances = new NativeArray<int>(map.Grid.Length, Allocator.Temp); // Temp because it only lives within the execution of this method
-            NativeQueue<int2> queue = new NativeQueue<int2>(Allocator.Temp);
+            NativeList<int2> deadEnds = new NativeList<int2>(allocator);
+            int2[] directions = { new int2(0, 1), new int2(0, -1), new int2(-1, 0), new int2(1, 0) };
 
-            ArrayInit(distances, -1); 
-
-            int startIndex = map.GetIndex(startPos.x, startPos.y);
-            distances[startIndex] = 0;
-            queue.Enqueue(startPos);
-
-            int2 furthestNode = startPos;
-            int maxDist = 0;
-
-            int2[] directions = { new int2(0, 1), new int2(0, -1), new int2(1, 0), new int2(-1, 0) };
-
-            while (queue.TryDequeue(out int2 current))
+            for (int x = 1; x < map.Width - 1; x++)
             {
-                int currIndex = map.GetIndex(current.x, current.y);
-                int currentDist = distances[currIndex];
-
-                if (currentDist > maxDist)
+                for (int y = 1; y < map.Height - 1; y++)
                 {
-                    maxDist = currentDist;
-                    furthestNode = current;
-                }
-
-                for (int i = 0; i < 4; i++)
-                {
-                    int2 neighbour = current + directions[i];
-                    if (neighbour.x < 0 || neighbour.y < 0 || neighbour.x >= map.Width || neighbour.y >= map.Height)
+                    if (map.Grid[map.GetIndex(x, y)] == CellType.Wall)
                     {
                         continue;
                     }
 
-                    int neighbourIndex = map.GetIndex(neighbour.x, neighbour.y);
-                    
-                    if (map.Grid[neighbourIndex] == CellType.Floor && distances[neighbourIndex] == -1)
+                    int wallCount = 0;
+                    foreach (var dir in directions)
                     {
-                        distances[neighbourIndex] = currentDist + 1;
-                        queue.Enqueue(neighbour);
-                    }
-                }
-            }
-
-            distances.Dispose();
-            queue.Dispose();
-            
-            maxDistanceFound = maxDist;
-            return furthestNode;
-        }
-
-        /// <summary>
-        /// This method initialises an array with a given value
-        /// </summary>
-        private static void ArrayInit(NativeArray<int> array, int value)
-        {
-            for (int i = 0; i < array.Length; i++)
-            {
-                array[i] = value;
-            }
-        }
-
-        /// <summary>
-        /// This method searches from the centre out for the first walkable floor
-        /// </summary>
-        private static int2 FindFirstFloor(MapData map)
-        {
-            int centerX = map.Width / 2;
-            int centerY = map.Height / 2;
-
-            if (map.Grid[map.GetIndex(centerX, centerY)] == CellType.Floor)
-            {
-                return new int2(centerX, centerY);
-            }
-
-            for (int i = 0; i < map.Grid.Length; i++)
-            {
-                if (map.Grid[i] == CellType.Floor)
-                {
-                    return new int2(i % map.Width, i / map.Width);
-                }
-            }
-            return new int2(-1, -1);
-        }
-        
-        /// <summary>
-        /// This method, given a seed, determines the possible cell candidates for objects + enemies to spawn
-        /// </summary>
-        public static void FindCellCandidates(MapData map, ref NativeList<SpawnPoint> currentPoints, int enemyCount, int objectCount, uint seed, int safeZoneRadius = 5)
-        {
-            int2 startPosition = int2.zero;
-            bool startFound = false;
-            foreach (SpawnPoint p in currentPoints) // Identify the player's start position to create safety distance
-            {
-                if (p.Type == EntityType.Start)
-                {
-                    startPosition = p.Coordinate;
-                    startFound = true;
-                    break;
-                }
-            }
-
-            NativeList<int2> candidates = new NativeList<int2>(map.Grid.Length, Allocator.Temp); // Candidate cells where an entity can spawn
-
-            for (int i = 0; i < map.Grid.Length; i++)
-            {
-                if (map.Grid[i] == CellType.Floor)
-                {
-                    int2 pos = new int2(i % map.Width, i / map.Width);
-                    
-                    float distToPlayer = math.distance(pos, startPosition);
-                    bool insideSafeZone = startFound && distToPlayer < safeZoneRadius;
-
-                    bool overlapsExisting = false;
-                    
-                    if (!insideSafeZone)
-                    {
-                        for (int k = 0; k < currentPoints.Length; k++)
+                        if (map.Grid[map.GetIndex(x + dir.x, y + dir.y)] == CellType.Wall)
                         {
-                            if (currentPoints[k].Coordinate.Equals(pos)) // If it's exit, overlaps
-                            {
-                                overlapsExisting = true;
-                                break;
-                            }
+                            wallCount++;
                         }
                     }
 
-                    if (!insideSafeZone && !overlapsExisting) // If it gets past the filters, it's valid
+                    if (wallCount >= 3) // If it's a dead-end (3 walls surrounding the cell
                     {
-                        candidates.Add(pos);
+                        deadEnds.Add(new int2(x, y));
                     }
                 }
             }
+            return deadEnds;
+        }
 
-            int totalAvailableSlots = candidates.Length;
-            int totalRequested = enemyCount + objectCount;
-
-            int finalEnemies = enemyCount;
-            int finalObjects = objectCount;
-
-            if (totalRequested > totalAvailableSlots)
-            {
-                finalEnemies = math.min(enemyCount, totalAvailableSlots);
-                
-                int remainingSlots = totalAvailableSlots - finalEnemies;
-                finalObjects = math.min(objectCount, remainingSlots);
-
-                Debug.LogWarning($"[MapAnalyzer] Overcrowding detected! Map has {totalAvailableSlots} slots but config requested {totalRequested} entities. " +
-                                 $"Adjusting to: {finalEnemies} Enemies, {finalObjects} Objects.");
-            }
-
-            if (totalAvailableSlots == 0)
-            {
-                Debug.LogWarning("[MapAnalyzer] No space for entities. Map is too small or SafeZone is too big.");
-                candidates.Dispose();
-                return;
-            }
-
-            // Fisher-Yates Shuffle for candidates
-            Unity.Mathematics.Random rng = new Unity.Mathematics.Random(seed);
+        /// <summary>
+        /// This method is a helper one which returns both the start and the exit of the map, ensuring they both are far away from each other
+        /// </summary>
+        /// <param name="map"></param>
+        /// <returns></returns>
+        private static (int2 start, int2 exit) GetStartAndExit(MapData map)
+        {
+            int2 start = int2.zero; 
+            int2 exit = int2.zero;
             
-            for (int i = candidates.Length - 1; i > 0; i--)
+            for (int i = 0; i < map.Grid.Length; i++) 
+            {
+                if (map.Grid[i] == CellType.Floor) 
+                {
+                    start = new int2(i % map.Width, i / map.Width);
+                    break;
+                }
+            }
+            
+            for (int i = map.Grid.Length - 1; i >= 0; i--) 
+            {
+                if (map.Grid[i] == CellType.Floor) 
+                {
+                    exit = new int2(i % map.Width, i / map.Width);
+                    break;
+                }
+            }
+            
+            return (start, exit);
+        }
+
+        /// <summary>
+        /// This method is a helper one which returns free cells within the map
+        /// </summary>
+        /// <param name="map"></param>
+        /// <param name="occupied"></param>
+        /// <param name="allocator"></param>
+        /// <returns></returns>
+        private static NativeList<int2> GetFreeFloorCells(MapData map, NativeList<int2> occupied, Allocator allocator)
+        {
+            NativeList<int2> floors = new NativeList<int2>(allocator);
+            for (int x = 0; x < map.Width; x++)
+            {
+                for (int y = 0; y < map.Height; y++)
+                {
+                    if (map.Grid[map.GetIndex(x, y)] == CellType.Floor)
+                    {
+                        int2 pos = new int2(x, y);
+                        if (!IsOccupied(pos, occupied))
+                        {
+                            floors.Add(pos);
+                        }
+                    }
+                }
+            }
+            
+            return floors;
+        }
+
+        /// <summary>
+        /// This method is a helper one which simply shuffles a list
+        /// </summary>
+        /// <param name="list"></param>
+        /// <typeparam name="T"></typeparam>
+        private static void Shuffle<T>(NativeList<T> list) where T : unmanaged
+        {
+            var rng = new Unity.Mathematics.Random((uint)System.DateTime.Now.Ticks);
+            for (int i = list.Length - 1; i > 0; i--)
             {
                 int j = rng.NextInt(i + 1);
-                (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+                (list[i], list[j]) = (list[j], list[i]);
             }
-
-            int candidateIndex = 0;
-
-            for (int i = 0; i < finalEnemies; i++)
-            {
-                currentPoints.Add(new SpawnPoint
-                {
-                    Coordinate = candidates[candidateIndex],
-                    Type = EntityType.Enemy,
-                    RotationY = rng.NextFloat(0, 360)
-                });
-                candidateIndex++;
-            }
-
-            for (int i = 0; i < finalObjects; i++)
-            {
-                currentPoints.Add(new SpawnPoint
-                {
-                    Coordinate = candidates[candidateIndex],
-                    Type = EntityType.Object,
-                    RotationY = rng.NextFloat(0, 360)
-                });
-                candidateIndex++;
-            }
-
-            candidates.Dispose();
         }
     }
 }
