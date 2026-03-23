@@ -1,6 +1,8 @@
 using UnityEngine;
 using Unity.Collections;
 using Unity.Mathematics;
+using Unity.Jobs;
+using Unity.Burst;
 using PCG.Core;
 
 namespace PCG.Modules.Environment
@@ -8,18 +10,13 @@ namespace PCG.Modules.Environment
     public static class MapAnalyzer
     {
         /// <summary>
-        /// This method analyses the map and gets the optimal spawn points to ensure good playability
+        /// Analyses the map to find the optimal spawn points using the Burst Compiler for maximum performance.
         /// </summary>
-        /// <param name="map"></param>
-        /// <param name="enemyCount"></param>
-        /// <param name="objectCount"></param>
-        /// <param name="allocator"></param>
-        /// <returns></returns>
         public static NativeList<SpawnPoint> GetOptimalSpawnPoints(MapData map, int enemyCount, int objectCount, Allocator allocator)
         {
             NativeList<SpawnPoint> results = new NativeList<SpawnPoint>(allocator);
             
-            // Search for far away start and exit points
+            // 1. Find Start and Exit points (Simple sequential search, fast enough on main thread)
             var endPoints = GetStartAndExit(map);
             int2 startPos = endPoints.start;
             int2 exitPos = endPoints.exit;
@@ -27,139 +24,186 @@ namespace PCG.Modules.Environment
             results.Add(new SpawnPoint(startPos, EntityType.Start, 0));
             results.Add(new SpawnPoint(exitPos, EntityType.Exit, 0));
 
-            // Occupied positions to ensure not to overlap
+            // Occupied positions to avoid overlapping entities
             NativeList<int2> occupiedPositions = new NativeList<int2>(allocator);
             occupiedPositions.Add(startPos);
             occupiedPositions.Add(exitPos);
+
+            // 2. Schedule Burst Jobs for heavy grid analysis
+            NativeList<int2> deadEnds = new NativeList<int2>(allocator);
+            NativeList<int2> freeFloors = new NativeList<int2>(allocator);
+
+            // Job to find dead ends (corridors with 3 walls)
+            FindDeadEndsJob deadEndsJob = new FindDeadEndsJob
+            {
+                Width = map.Width,
+                Height = map.Height,
+                Grid = map.Grid,
+                DeadEnds = deadEnds
+            };
             
-            NativeList<int2> deadEnds = GetDeadEnds(map, allocator);
+            // Job to find all available floor cells
+            FindFreeFloorsJob freeFloorsJob = new FindFreeFloorsJob
+            {
+                Width = map.Width,
+                Height = map.Height,
+                Grid = map.Grid,
+                FreeFloors = freeFloors
+            };
+
+            // Schedule both jobs to run in parallel on worker threads
+            JobHandle deadEndsHandle = deadEndsJob.Schedule();
+            JobHandle freeFloorsHandle = freeFloorsJob.Schedule();
             
-            // Objects placement
+            // Wait for both jobs to finish before proceeding
+            JobHandle.CompleteAll(ref deadEndsHandle, ref freeFloorsHandle);
+            
+            // --- SHUFFLE LISTS TO AVOID LINEAR PLACEMENT ---
+            Shuffle(deadEnds);
+            Shuffle(freeFloors);
+
+            // --- LOOT PLACEMENT ---
             int itemsPlaced = 0;
             
-            // Try to place at dead-ends (as they are the best positions)
-            foreach (int2 deadEnd in deadEnds)
+            // Priority 1: Place loot in dead ends
+            for (int i = 0; i < deadEnds.Length; i++)
             {
-                if (itemsPlaced >= objectCount)
-                {
-                    break;
-                }
+                if (itemsPlaced >= objectCount) break;
+                
+                int2 pos = deadEnds[i];
+                if (IsOccupied(pos, occupiedPositions)) continue;
 
-                if (IsOccupied(deadEnd, occupiedPositions))
-                {
-                    continue;
-                }
-
-                results.Add(new SpawnPoint(deadEnd, EntityType.Object, 0));
-                occupiedPositions.Add(deadEnd);
+                results.Add(new SpawnPoint(pos, EntityType.Object, 0));
+                occupiedPositions.Add(pos);
                 itemsPlaced++;
             }
             
-            // If there are no dead-ends, place anywhere
+            // Priority 2: Fallback to random free floors if not enough dead ends exist
             if (itemsPlaced < objectCount)
             {
-                NativeList<int2> allFloors = GetFreeFloorCells(map, occupiedPositions, allocator);
-                Shuffle(allFloors);
-
-                int fallbackIndex = 0;
-                while (itemsPlaced < objectCount && fallbackIndex < allFloors.Length)
+                for (int i = 0; i < freeFloors.Length; i++)
                 {
-                    int2 pos = allFloors[fallbackIndex];
+                    if (itemsPlaced >= objectCount) break;
+                    
+                    int2 pos = freeFloors[i];
+                    if (IsOccupied(pos, occupiedPositions)) continue;
+
                     results.Add(new SpawnPoint(pos, EntityType.Object, 0));
                     occupiedPositions.Add(pos);
                     itemsPlaced++;
-                    fallbackIndex++;
                 }
-                allFloors.Dispose();
             }
 
-            // Enemies placement
-            NativeList<int2> enemyCandidates = GetFreeFloorCells(map, occupiedPositions, allocator);
-            Shuffle(enemyCandidates);
-
+            // --- ENEMY PLACEMENT ---
             int enemiesPlaced = 0;
-            for (int i = 0; i < enemyCandidates.Length; i++)
+            
+            for (int i = 0; i < freeFloors.Length; i++)
             {
-                if (enemiesPlaced >= enemyCount)
-                {
-                    break;
-                }
+                if (enemiesPlaced >= enemyCount) break;
 
-                int2 pos = enemyCandidates[i];
-                
+                int2 pos = freeFloors[i];
+                if (IsOccupied(pos, occupiedPositions)) continue;
+
+                // Random rotation facing one of the 4 cardinal directions
                 float randomRot = UnityEngine.Random.Range(0, 4) * 90f;
                 results.Add(new SpawnPoint(pos, EntityType.Enemy, randomRot));
+                occupiedPositions.Add(pos);
                 enemiesPlaced++;
             }
 
+            // Clean up memory
             deadEnds.Dispose();
+            freeFloors.Dispose();
             occupiedPositions.Dispose();
-            enemyCandidates.Dispose();
 
             return results;
         }
-        
-        /// <summary>
-        /// This method is a helper one which returns whether a position is occupied or not
-        /// </summary>
-        /// <param name="pos"></param>
-        /// <param name="occupied"></param>
-        /// <returns></returns>
+
+        // ==========================================
+        // BURST COMPILED JOBS
+        // ==========================================
+
+        [BurstCompile(CompileSynchronously = true)]
+        private struct FindDeadEndsJob : IJob
+        {
+            [ReadOnly] public int Width;
+            [ReadOnly] public int Height;
+            [ReadOnly] public NativeArray<CellType> Grid;
+            
+            public NativeList<int2> DeadEnds;
+
+            public void Execute()
+            {
+                NativeArray<int2> directions = new NativeArray<int2>(4, Allocator.Temp);
+                directions[0] = new int2(0, 1);
+                directions[1] = new int2(0, -1);
+                directions[2] = new int2(1, 0);
+                directions[3] = new int2(-1, 0);
+
+                for (int x = 1; x < Width - 1; x++)
+                {
+                    for (int y = 1; y < Height - 1; y++)
+                    {
+                        if (Grid[(y * Width) + x] == CellType.Wall) continue;
+
+                        int wallCount = 0;
+                        for (int i = 0; i < 4; i++)
+                        {
+                            int2 dir = directions[i];
+                            if (Grid[((y + dir.y) * Width) + (x + dir.x)] == CellType.Wall)
+                            {
+                                wallCount++;
+                            }
+                        }
+
+                        if (wallCount >= 3)
+                        {
+                            DeadEnds.Add(new int2(x, y));
+                        }
+                    }
+                }
+                
+                directions.Dispose();
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true)]
+        private struct FindFreeFloorsJob : IJob
+        {
+            [ReadOnly] public int Width;
+            [ReadOnly] public int Height;
+            [ReadOnly] public NativeArray<CellType> Grid;
+            
+            public NativeList<int2> FreeFloors;
+
+            public void Execute()
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    for (int y = 0; y < Height; y++)
+                    {
+                        if (Grid[(y * Width) + x] == CellType.Floor)
+                        {
+                            FreeFloors.Add(new int2(x, y));
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // HELPER METHODS
+        // ==========================================
+
         private static bool IsOccupied(int2 pos, NativeList<int2> occupied)
         {
             for (int i = 0; i < occupied.Length; i++)
             {
-                if (occupied[i].Equals(pos))
-                {
-                    return true;
-                }
+                if (occupied[i].Equals(pos)) return true;
             }
             return false;
         }
 
-        /// <summary>
-        /// This method is a helper one which returns all the dead-ends within the map
-        /// </summary>
-        /// <param name="map"></param>
-        /// <param name="allocator"></param>
-        /// <returns></returns>
-        private static NativeList<int2> GetDeadEnds(MapData map, Allocator allocator)
-        {
-            NativeList<int2> deadEnds = new NativeList<int2>(allocator);
-            int2[] directions = { new int2(0, 1), new int2(0, -1), new int2(-1, 0), new int2(1, 0) };
-
-            for (int x = 1; x < map.Width - 1; x++)
-            {
-                for (int y = 1; y < map.Height - 1; y++)
-                {
-                    if (map.Grid[map.GetIndex(x, y)] == CellType.Wall)
-                    {
-                        continue;
-                    }
-
-                    int wallCount = 0;
-                    foreach (var dir in directions)
-                    {
-                        if (map.Grid[map.GetIndex(x + dir.x, y + dir.y)] == CellType.Wall)
-                        {
-                            wallCount++;
-                        }
-                    }
-
-                    if (wallCount >= 3) // If it's a dead-end (3 walls surrounding the cell
-                    {
-                        deadEnds.Add(new int2(x, y));
-                    }
-                }
-            }
-            return deadEnds;
-        }
-
-        /// <summary>
-        /// This method is a helper one which returns both the start and the exit of the map, ensuring they both are far away from each other
-        /// </summary>
-        /// <param name="map"></param>
-        /// <returns></returns>
         private static (int2 start, int2 exit) GetStartAndExit(MapData map)
         {
             int2 start = int2.zero; 
@@ -186,46 +230,15 @@ namespace PCG.Modules.Environment
             return (start, exit);
         }
 
-        /// <summary>
-        /// This method is a helper one which returns free cells within the map
-        /// </summary>
-        /// <param name="map"></param>
-        /// <param name="occupied"></param>
-        /// <param name="allocator"></param>
-        /// <returns></returns>
-        private static NativeList<int2> GetFreeFloorCells(MapData map, NativeList<int2> occupied, Allocator allocator)
-        {
-            NativeList<int2> floors = new NativeList<int2>(allocator);
-            for (int x = 0; x < map.Width; x++)
-            {
-                for (int y = 0; y < map.Height; y++)
-                {
-                    if (map.Grid[map.GetIndex(x, y)] == CellType.Floor)
-                    {
-                        int2 pos = new int2(x, y);
-                        if (!IsOccupied(pos, occupied))
-                        {
-                            floors.Add(pos);
-                        }
-                    }
-                }
-            }
-            
-            return floors;
-        }
-
-        /// <summary>
-        /// This method is a helper one which simply shuffles a list
-        /// </summary>
-        /// <param name="list"></param>
-        /// <typeparam name="T"></typeparam>
         private static void Shuffle<T>(NativeList<T> list) where T : unmanaged
         {
             var rng = new Unity.Mathematics.Random((uint)System.DateTime.Now.Ticks);
             for (int i = list.Length - 1; i > 0; i--)
             {
                 int j = rng.NextInt(i + 1);
-                (list[i], list[j]) = (list[j], list[i]);
+                T temp = list[i];
+                list[i] = list[j];
+                list[j] = temp;
             }
         }
     }

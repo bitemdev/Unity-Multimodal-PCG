@@ -56,7 +56,7 @@ namespace PCG.Modules.Entities
 
             foreach (SpawnPoint point in spawnPoints)
             {
-                Vector3 basePosition = new Vector3(point.Coordinate.x, 0, point.Coordinate.y);
+                Vector3 basePosition = new Vector3(point.Coordinate.x + 0.5f, 0f, point.Coordinate.y + 0.5f);
                 Quaternion rotation = Quaternion.Euler(0, point.RotationY, 0);
 
                 switch (point.Type)

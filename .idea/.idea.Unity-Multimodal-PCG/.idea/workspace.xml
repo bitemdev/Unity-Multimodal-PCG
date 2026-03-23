@@ -4,7 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9793d3e9-fe30-41e0-9044-0ad29646b849" name="Changes" comment="" />
+    <list default="true" id="9793d3e9-fe30-41e0-9044-0ad29646b849" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/Assets/PCG/Data/DebugPCGConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/PCG/Data/DebugPCGConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PCG/Modules/Entities/EntityManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/PCG/Modules/Entities/EntityManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/DungeonGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/DungeonGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/MapAnalyzer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/MapAnalyzer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/MazeGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/MazeGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/Rendering/ProceduralMeshBuilder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/PCG/Modules/Environment/Rendering/ProceduralMeshBuilder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/PCG/Scenes/PCG_Sandbox.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/PCG/Scenes/PCG_Sandbox.unity" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -48,7 +56,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "feat/serialisation-and-save-system",
+    "git-widget-placeholder": "feat/jobs-and-burst-system",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
     "node.js.detected.package.eslint": "true",
@@ -117,6 +125,7 @@
       <workItem from="1769674076885" duration="526000" />
       <workItem from="1769794393205" duration="1267000" />
       <workItem from="1770741290559" duration="873000" />
+      <workItem from="1774257174588" duration="4303000" />
     </task>
     <servers />
   </component>

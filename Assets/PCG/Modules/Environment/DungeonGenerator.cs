@@ -1,6 +1,9 @@
 using PCG.Core;
 using Unity.Collections;
+using Unity.Jobs;
+using Unity.Burst;
 using UnityEngine;
+using Unity.Mathematics;
 using Random = Unity.Mathematics.Random;
 
 namespace PCG.Modules.Environment
@@ -9,375 +12,283 @@ namespace PCG.Modules.Environment
     {
         private const int MinNodeSize = 15; // Min space for Room + Walls
         private const int MinRoomSize = 6; // Min space for Room
-        private const int RoomMargin = 2; // Margin between rooms -> Higher value, more separated rooms with longer corridors
+        private const int RoomMargin = 2; // Margin between rooms
         private const int MinCorridorWidth = 1;
         private const int MaxCorridorWidth = 3;
 
-        // Struct is used because it does not generate garbage + is contained within the stack or nativearrays (way faster than classes)
-        private struct BSPNode
-        {
-            public int ID; // List index
-            public RectInt Bounds; // Total area
-            public RectInt Room; // Carved room
-            
-            // Integers are way more optimised than references
-            public int LeftChildIndex;
-            public int RightChildIndex;
-            public bool IsLeaf => LeftChildIndex == -1 && RightChildIndex == -1;
-        }
-
         /// <summary>
-        /// This method generates a dungeon map using an optimised modification of BSP (iterative + garbage collection)
+        /// This method generates a dungeon map using a Burst-Compiled, optimised BSP algorithm
         /// </summary>
         public MapData Generate(int seed, Vector2Int size)
         {
-            Debug.Log($"[DungeonGenerator] Starting optimised BSP with Seed: {seed}");
+            Debug.Log($"[DungeonGenerator] Starting Burst-Compiled BSP with Seed: {seed}");
 
             MapData map = new MapData(size.x, size.y, Allocator.Persistent);
-            Random rng = new Random((uint)seed);
 
+            // Init grid to walls
             for (int i = 0; i < map.Grid.Length; i++)
             {
                 map.Grid[i] = CellType.Wall;
             }
-            
-            int estimatedCapacity = (size.x * size.y) / (MinNodeSize * MinNodeSize) * 2; // Worst case scenario capacity. Precalculating this makes the code faster, as it will not redimensionate memory
-            NativeList<BSPNode> tree = new NativeList<BSPNode>(estimatedCapacity, Allocator.Temp); // Temp is used because it only lives during this method
-            BSPNode root = new BSPNode
+
+            // Setup the Job
+            DungeonJob job = new DungeonJob
             {
-                ID = 0,
-                Bounds = new RectInt(2, 2, size.x - 4, size.y - 4), // Security margin for borders
-                LeftChildIndex = -1, RightChildIndex = -1
-            }; // Root node
-            tree.Add(root);
+                Seed = (uint)seed,
+                Width = size.x,
+                Height = size.y,
+                MinNodeSize = MinNodeSize,
+                MinRoomSize = MinRoomSize,
+                RoomMargin = RoomMargin,
+                MinCorridorWidth = MinCorridorWidth,
+                MaxCorridorWidth = MaxCorridorWidth,
+                Grid = map.Grid
+            };
 
-            int processIndex = 0; // This simulates a Queue without actually deleting elements
-            
-            while (processIndex < tree.Length)
-            {
-                BSPNode currentNode = tree[processIndex]; // Copy of the current node
+            // Execute the Job on a worker thread and wait for completion
+            job.Schedule().Complete();
 
-                ProcessSplit(ref tree, currentNode, ref rng); // Try to split space
-                
-                processIndex++; // Next node
-            }
-
-            // Organic room building
-            for (int i = 0; i < tree.Length; i++)
-            {
-                BSPNode node = tree[i];
-                if (node.IsLeaf)
-                {
-                    int maxW = node.Bounds.width - (RoomMargin * 2);
-                    int maxH = node.Bounds.height - (RoomMargin * 2);
-
-                    if (maxW < MinRoomSize)
-                    {
-                        maxW = MinRoomSize;
-                    }
-
-                    if (maxH < MinRoomSize)
-                    {
-                        maxH = MinRoomSize;
-                    }
-
-                    int w = rng.NextInt(MinRoomSize, maxW + 1);
-                    int h = rng.NextInt(MinRoomSize, maxH + 1);
-
-                    int freeX = maxW - w;
-                    int freeY = maxH - h;
-                    
-                    int x = node.Bounds.x + RoomMargin + (freeX > 0 ? rng.NextInt(0, freeX + 1) : 0);
-                    int y = node.Bounds.y + RoomMargin + (freeY > 0 ? rng.NextInt(0, freeY + 1) : 0);
-
-                    node.Room = new RectInt(x, y, w, h);
-                    tree[i] = node; // Struct update
-                    
-                    PaintRoom(map, node.Room);
-                }
-            }
-
-            // Iterate backwards to let parent know where children are
-            for (int i = tree.Length - 1; i >= 0; i--)
-            {
-                BSPNode node = tree[i];
-                if (!node.IsLeaf)
-                {
-                    BSPNode childSource = rng.NextBool() ? tree[node.LeftChildIndex] : tree[node.RightChildIndex]; // Randomly decide if parent connects with left or right child
-                    node.Room = childSource.Room;
-                    tree[i] = node; // Struct update
-                }
-            }
-
-            // Every parent knows where their children are at, now it connects brothers
-            for (int i = 0; i < tree.Length; i++)
-            {
-                BSPNode node = tree[i];
-                if (!node.IsLeaf)
-                {
-                    BSPNode left = tree[node.LeftChildIndex];
-                    BSPNode right = tree[node.RightChildIndex];
-
-                    ConnectRooms(map, left.Room, right.Room, ref rng);
-                }
-            }
-
-            tree.Dispose(); // Clean up memory
             return map;
         }
 
-        /// <summary>
-        /// This method determines whether a given space can be split or not. If yes, it splits it
-        /// </summary>
-        private void ProcessSplit(ref NativeList<BSPNode> tree, BSPNode parent, ref Random rng)
+        // ==========================================
+        // BURST COMPILED JOB
+        // ==========================================
+
+        [BurstCompile(CompileSynchronously = true)]
+        private struct DungeonJob : IJob
         {
-            bool canSplitH = parent.Bounds.height >= MinNodeSize * 2;
-            bool canSplitV = parent.Bounds.width >= MinNodeSize * 2;
+            public uint Seed;
+            public int Width;
+            public int Height;
+            public int MinNodeSize;
+            public int MinRoomSize;
+            public int RoomMargin;
+            public int MinCorridorWidth;
+            public int MaxCorridorWidth;
 
-            if (!canSplitH && !canSplitV)
+            public NativeArray<CellType> Grid;
+
+            // Struct modified for Burst: int4 replaces RectInt (x, y, width, height)
+            private struct BSPNode
             {
-                return;
-            }
-
-            bool splitH = rng.NextBool();
-            if (parent.Bounds.width > parent.Bounds.height * 1.25f)
-            {
-                splitH = false;
-            }
-            else if (parent.Bounds.height > parent.Bounds.width * 1.25f)
-            {
-                splitH = true;
-            }
-
-            if (splitH && !canSplitH)
-            {
-                splitH = false;
-            }
-
-            if (!splitH && !canSplitV)
-            {
-                splitH = true;
-            }
-
-            RectInt rect1, rect2; // Children
-            int splitPoint;
-
-            if (splitH) // Y axis
-            {
-                splitPoint = rng.NextInt(parent.Bounds.y + MinNodeSize, parent.Bounds.y + parent.Bounds.height - MinNodeSize);
-                rect1 = new RectInt(parent.Bounds.x, parent.Bounds.y, parent.Bounds.width, splitPoint - parent.Bounds.y);
-                rect2 = new RectInt(parent.Bounds.x, splitPoint, parent.Bounds.width, parent.Bounds.y + parent.Bounds.height - splitPoint);
-            }
-            else // X axis
-            {
-                splitPoint = rng.NextInt(parent.Bounds.x + MinNodeSize, parent.Bounds.x + parent.Bounds.width - MinNodeSize);
-                rect1 = new RectInt(parent.Bounds.x, parent.Bounds.y, splitPoint - parent.Bounds.x, parent.Bounds.height);
-                rect2 = new RectInt(splitPoint, parent.Bounds.y, parent.Bounds.x + parent.Bounds.width - splitPoint, parent.Bounds.height);
-            }
-
-            // Create children and add them to list
-            int idxL = tree.Length;
-            tree.Add(new BSPNode { ID = idxL, Bounds = rect1, LeftChildIndex = -1, RightChildIndex = -1 });
-            int idxR = tree.Length;
-            tree.Add(new BSPNode { ID = idxR, Bounds = rect2, LeftChildIndex = -1, RightChildIndex = -1 });
-
-            // Update parent with children indices
-            parent.LeftChildIndex = idxL;
-            parent.RightChildIndex = idxR;
-            
-            tree[parent.ID] = parent; // Update info for struct
-        }
-
-        /// <summary>
-        /// This method creates a single room
-        /// </summary>
-        private void PaintRoom(MapData map, RectInt room)
-        {
-            for (int x = room.x; x < room.x + room.width; x++)
-            {
-                for (int y = room.y; y < room.y + room.height; y++)
-                {
-                    map.Grid[map.GetIndex(x, y)] = CellType.Floor;
-                }
-            }
-        }
-
-        /// <summary>
-        /// This method connects two rooms
-        /// </summary>
-        private void ConnectRooms(MapData map, RectInt roomA, RectInt roomB, ref Random rng)
-        {
-            int corridorWidth = rng.NextInt(MinCorridorWidth, MaxCorridorWidth + 1);
-
-            Vector2Int cA = new Vector2Int((int)roomA.center.x, (int)roomA.center.y);
-            Vector2Int cB = new Vector2Int((int)roomB.center.x, (int)roomB.center.y);
-
-            bool overlapX = (roomA.xMin < roomB.xMax - corridorWidth) && (roomB.xMin < roomA.xMax - corridorWidth);
-            bool overlapY = (roomA.yMin < roomB.yMax - corridorWidth) && (roomB.yMin < roomA.yMax - corridorWidth);
-
-            if (overlapX) // Vertical connection, search for common X to build corridor
-            {
-                int commonXMin = Mathf.Max(roomA.xMin, roomB.xMin);
-                int commonXMax = Mathf.Min(roomA.xMax, roomB.xMax);
+                public int ID; 
+                public int4 Bounds; 
+                public int4 Room; 
                 
-                int safeMin = commonXMin + 1; 
-                int safeMax = commonXMax - corridorWidth - 1; 
-
-                int xPos;
-                if (safeMax < safeMin)
-                {
-                    xPos = (commonXMin + commonXMax) / 2; // If it's tight, go to centre
-                }
-                else
-                {
-                    xPos = rng.NextInt(safeMin, safeMax + 1);
-                }
-
-                // Connect closest Ys
-                int startY = (cA.y < cB.y) ? roomA.yMax : roomB.yMax;
-                int endY = (cA.y < cB.y) ? roomB.yMin : roomA.yMin;
-                
-                CarveTunnel(map, new Vector2Int(xPos, startY - 1), new Vector2Int(xPos, endY), corridorWidth);
+                public int LeftChildIndex;
+                public int RightChildIndex;
+                public bool IsLeaf => LeftChildIndex == -1 && RightChildIndex == -1;
             }
-            else if (overlapY) // Horizontal connection, search for common Y to build corridor
+
+            public void Execute()
             {
-                int commonYMin = Mathf.Max(roomA.yMin, roomB.yMin);
-                int commonYMax = Mathf.Min(roomA.yMax, roomB.yMax);
+                Random rng = new Random(Seed);
 
-                int safeMin = commonYMin + 1;
-                int safeMax = commonYMax - corridorWidth - 1;
+                // Use NativeList instead of C# List (Zero GC)
+                NativeList<BSPNode> tree = new NativeList<BSPNode>(Allocator.Temp);
+                NativeList<int> leafIndices = new NativeList<int>(Allocator.Temp);
 
-                int yPos;
-                if (safeMax < safeMin)
+                // Create root node
+                BSPNode root = new BSPNode
                 {
-                    yPos = (commonYMin + commonYMax) / 2;
-                }
-                else
+                    ID = 0,
+                    Bounds = new int4(0, 0, Width, Height),
+                    Room = new int4(0, 0, 0, 0),
+                    LeftChildIndex = -1,
+                    RightChildIndex = -1
+                };
+
+                tree.Add(root);
+                leafIndices.Add(0);
+
+                // 1. SPLIT PROCESS (Your iterative approach)
+                bool didSplit = true;
+                while (didSplit)
                 {
-                    yPos = rng.NextInt(safeMin, safeMax + 1);
-                }
-
-                int startX = (cA.x < cB.x) ? roomA.xMax : roomB.xMax;
-                int endX = (cA.x < cB.x) ? roomB.xMin : roomA.xMin;
-
-                CarveTunnel(map, new Vector2Int(startX - 1, yPos), new Vector2Int(endX, yPos), corridorWidth);
-            }
-            else // L-connection
-            {
-                bool moveHorizontalFirst = rng.NextBool();
-
-                if (Mathf.Abs(cA.x - cB.x) > Mathf.Abs(cA.y - cB.y) * 1.5f) // Horizontal distance is higher
-                {
-                    moveHorizontalFirst = true;
-                }
-                else if (Mathf.Abs(cA.y - cB.y) > Mathf.Abs(cA.x - cB.x) * 1.5f)
-                {
-                    moveHorizontalFirst = false;
-                }
-
-                Vector2Int elbow;
-
-                if (moveHorizontalFirst) // From Left/Right A to Up/Down B
-                {
-                    int yA = GetRandomPointOnWall(roomA.yMin, roomA.yMax, corridorWidth, ref rng);
-                    int xB = GetRandomPointOnWall(roomB.xMin, roomB.xMax, corridorWidth, ref rng);
+                    didSplit = false;
                     
-                    int xA = (cA.x < cB.x) ? roomA.xMax : roomA.xMin; 
-                    int yB = (cA.y < cB.y) ? roomB.yMin : roomB.yMax;
-
-                    xA = (cA.x < cB.x) ? xA - 1 : xA; 
-                    elbow = new Vector2Int(xB, yA);
-                    
-                    // A -> Elbow (Horiz), Elbow -> B (Vert)
-                    CarveTunnel(map, new Vector2Int(xA, yA), elbow, corridorWidth);
-                    CarveTunnel(map, elbow, new Vector2Int(xB, yB), corridorWidth);
-                }
-                else // From Up/Down A to Left/Right B
-                {
-                    int xA = GetRandomPointOnWall(roomA.xMin, roomA.xMax, corridorWidth, ref rng);
-                    int yB = GetRandomPointOnWall(roomB.yMin, roomB.yMax, corridorWidth, ref rng);
-
-                    int yA = (cA.y < cB.y) ? roomA.yMax : roomA.yMin;
-                    int xB = (cA.x < cB.x) ? roomB.xMin : roomB.xMax;
-                    
-                    yA = (cA.y < cB.y) ? yA - 1 : yA;
-                    elbow = new Vector2Int(xA, yB);
-
-                    CarveTunnel(map, new Vector2Int(xA, yA), elbow, corridorWidth);
-                    CarveTunnel(map, elbow, new Vector2Int(xB, yB), corridorWidth);
-                }
-            }
-        }
-
-        /// <summary>
-        /// This method returns a random coordinate in range with a minimum width
-        /// </summary>
-        private int GetRandomPointOnWall(int min, int max, int width, ref Random rng)
-        {
-            int safeMin = min + 1;
-            int safeMax = max - width - 1;
-
-            if (safeMax <= safeMin)
-            {
-                return (min + max) / 2; // No space, centre
-            }
-            
-            return rng.NextInt(safeMin, safeMax + 1);
-        }
-
-        /// <summary>
-        /// This method creates a single corridor given a start, an end and a width. It is optimised to not calculate limits every iteration
-        /// </summary>
-        private void CarveTunnel(MapData map, Vector2Int start, Vector2Int end, int width)
-        {
-            int xMin = Mathf.Min(start.x, end.x);
-            int xMax = Mathf.Max(start.x, end.x);
-            int yMin = Mathf.Min(start.y, end.y);
-            int yMax = Mathf.Max(start.y, end.y);
-            
-            bool isHorizontal = (xMax - xMin) > (yMax - yMin);
-
-            if (isHorizontal)
-            {
-                int drawXStart = xMin;
-                int drawXEnd = xMax + (width / 2);
-                drawXStart = Mathf.Max(1, drawXStart);
-                drawXEnd = Mathf.Min(map.Width - 2, drawXEnd);
-                
-                for (int x = drawXStart; x <= drawXEnd; x++) 
-                {
-                    int drawYStart = yMin - (width / 2);
-                    int drawYEnd = drawYStart + width;
-                    
-                    // Clamp Y
-                    int finalYStart = Mathf.Max(1, drawYStart);
-                    int finalYEnd = Mathf.Min(map.Height - 2, drawYEnd);
-
-                    for (int y = finalYStart; y < finalYEnd; y++)
+                    // We need to iterate over the current leaves, but adding new ones modifies the list.
+                    // So we copy the current leaves to a temporary list for this pass.
+                    NativeList<int> currentLeaves = new NativeList<int>(Allocator.Temp);
+                    for (int i = 0; i < leafIndices.Length; i++)
                     {
-                        map.Grid[map.GetIndex(x, y)] = CellType.Floor; // Direct access to memory
+                        currentLeaves.Add(leafIndices[i]);
+                    }
+                    
+                    leafIndices.Clear(); // We will refill it with the new children (or keep the ones that couldn't split)
+
+                    for (int i = 0; i < currentLeaves.Length; i++)
+                    {
+                        int currentIndex = currentLeaves[i];
+                        BSPNode node = tree[currentIndex];
+                        int4 b = node.Bounds;
+
+                        bool canSplitH = b.w >= MinNodeSize * 2;
+                        bool canSplitV = b.z >= MinNodeSize * 2;
+
+                        if (!canSplitH && !canSplitV)
+                        {
+                            leafIndices.Add(currentIndex); // Kept as leaf
+                            continue;
+                        }
+
+                        bool splitH = false;
+                        if (canSplitH && canSplitV)
+                        {
+                            splitH = rng.NextFloat() > 0.5f;
+                        }
+                        else if (canSplitH)
+                        {
+                            splitH = true;
+                        }
+
+                        int maxSplit;
+                        BSPNode leftNode = new BSPNode { LeftChildIndex = -1, RightChildIndex = -1, Room = new int4(0,0,0,0) };
+                        BSPNode rightNode = new BSPNode { LeftChildIndex = -1, RightChildIndex = -1, Room = new int4(0,0,0,0) };
+
+                        if (splitH)
+                        {
+                            maxSplit = b.w - MinNodeSize;
+                            int splitPos = rng.NextInt(MinNodeSize, maxSplit);
+
+                            leftNode.Bounds = new int4(b.x, b.y, b.z, splitPos);
+                            rightNode.Bounds = new int4(b.x, b.y + splitPos, b.z, b.w - splitPos);
+                        }
+                        else
+                        {
+                            maxSplit = b.z - MinNodeSize;
+                            int splitPos = rng.NextInt(MinNodeSize, maxSplit);
+
+                            leftNode.Bounds = new int4(b.x, b.y, splitPos, b.w);
+                            rightNode.Bounds = new int4(b.x + splitPos, b.y, b.z - splitPos, b.w);
+                        }
+
+                        // Add children to tree
+                        leftNode.ID = tree.Length;
+                        int leftIdx = tree.Length;
+                        tree.Add(leftNode);
+                        
+                        rightNode.ID = tree.Length;
+                        int rightIdx = tree.Length;
+                        tree.Add(rightNode);
+
+                        // Update parent
+                        node.LeftChildIndex = leftIdx;
+                        node.RightChildIndex = rightIdx;
+                        tree[currentIndex] = node;
+
+                        leafIndices.Add(leftIdx);
+                        leafIndices.Add(rightIdx);
+                        
+                        didSplit = true;
+                    }
+                    
+                    currentLeaves.Dispose();
+                }
+
+                // 2. CARVE ROOMS (Iterating only over leaves)
+                for (int i = 0; i < leafIndices.Length; i++)
+                {
+                    int leafIdx = leafIndices[i];
+                    BSPNode node = tree[leafIdx];
+                    int4 b = node.Bounds;
+
+                    int roomW = rng.NextInt(MinRoomSize, b.z - RoomMargin * 2);
+                    int roomH = rng.NextInt(MinRoomSize, b.w - RoomMargin * 2);
+                    int roomX = b.x + RoomMargin + rng.NextInt(0, b.z - roomW - RoomMargin * 2);
+                    int roomY = b.y + RoomMargin + rng.NextInt(0, b.w - roomH - RoomMargin * 2);
+
+                    node.Room = new int4(roomX, roomY, roomW, roomH);
+                    tree[leafIdx] = node;
+
+                    // Carve Room
+                    for (int x = node.Room.x; x < node.Room.x + node.Room.z; x++)
+                    {
+                        for (int y = node.Room.y; y < node.Room.y + node.Room.w; y++)
+                        {
+                            if (x > 0 && x < Width - 1 && y > 0 && y < Height - 1)
+                            {
+                                Grid[(y * Width) + x] = CellType.Floor;
+                            }
+                        }
                     }
                 }
-            }
-            else // Vertical
-            {
-                int drawYStart = yMin;
-                int drawYEnd = yMax + (width / 2);
 
-                drawYStart = Mathf.Max(1, drawYStart);
-                drawYEnd = Mathf.Min(map.Height - 2, drawYEnd);
-
-                for (int y = drawYStart; y <= drawYEnd; y++)
+                // 3. CREATE CORRIDORS (Iterating backwards to process bottom-up)
+                for (int i = tree.Length - 1; i >= 0; i--)
                 {
-                    int drawXStart = xMin - (width / 2);
-                    int drawXEnd = drawXStart + width;
-
-                    int finalXStart = Mathf.Max(1, drawXStart);
-                    int finalXEnd = Mathf.Min(map.Width - 2, drawXEnd);
-
-                    for (int x = finalXStart; x < finalXEnd; x++)
+                    BSPNode node = tree[i];
+                    if (!node.IsLeaf)
                     {
-                        map.Grid[map.GetIndex(x, y)] = CellType.Floor;
+                        BSPNode leftChild = tree[node.LeftChildIndex];
+                        BSPNode rightChild = tree[node.RightChildIndex];
+
+                        int2 leftCenter = new int2(leftChild.Room.x + (leftChild.Room.z / 2), leftChild.Room.y + (leftChild.Room.w / 2));
+                        int2 rightCenter = new int2(rightChild.Room.x + (rightChild.Room.z / 2), rightChild.Room.y + (rightChild.Room.w / 2));
+
+                        int corridorWidth = rng.NextInt(MinCorridorWidth, MaxCorridorWidth + 1);
+
+                        // Connect children
+                        if (rng.NextFloat() > 0.5f)
+                        {
+                            CarveCorridor(leftCenter.x, leftCenter.y, rightCenter.x, leftCenter.y, corridorWidth);
+                            CarveCorridor(rightCenter.x, leftCenter.y, rightCenter.x, rightCenter.y, corridorWidth);
+                        }
+                        else
+                        {
+                            CarveCorridor(leftCenter.x, leftCenter.y, leftCenter.x, rightCenter.y, corridorWidth);
+                            CarveCorridor(leftCenter.x, rightCenter.y, rightCenter.x, rightCenter.y, corridorWidth);
+                        }
+
+                        // Pass room data up to parent
+                        node.Room = leftChild.Room;
+                        tree[i] = node;
+                    }
+                }
+
+                tree.Dispose();
+                leafIndices.Dispose();
+            }
+
+            // Burst-compatible corridor carving logic
+            private void CarveCorridor(int x1, int y1, int x2, int y2, int width)
+            {
+                int minX = math.min(x1, x2);
+                int maxX = math.max(x1, x2);
+                int minY = math.min(y1, y2);
+                int maxY = math.max(y1, y2);
+
+                if (minX == maxX) // Vertical corridor
+                {
+                    int drawYStart = math.max(1, minY);
+                    int drawYEnd = math.min(Height - 2, maxY + (width / 2));
+
+                    for (int y = drawYStart; y <= drawYEnd; y++)
+                    {
+                        int drawXStart = math.max(1, minX - (width / 2));
+                        int drawXEnd = math.min(Width - 2, drawXStart + width);
+
+                        for (int x = drawXStart; x < drawXEnd; x++)
+                        {
+                            Grid[(y * Width) + x] = CellType.Floor;
+                        }
+                    }
+                }
+                else // Horizontal corridor
+                {
+                    int drawXStart = math.max(1, minX);
+                    int drawXEnd = math.min(Width - 2, maxX + (width / 2));
+
+                    for (int x = drawXStart; x <= drawXEnd; x++)
+                    {
+                        int drawYStart = math.max(1, minY - (width / 2));
+                        int drawYEnd = math.min(Height - 2, drawYStart + width);
+
+                        for (int y = drawYStart; y < drawYEnd; y++)
+                        {
+                            Grid[(y * Width) + x] = CellType.Floor;
+                        }
                     }
                 }
             }

@@ -1,112 +1,156 @@
 using PCG.Core;
 using Unity.Collections;
+using Unity.Jobs;
+using Unity.Burst;
 using UnityEngine;
-using Random = Unity.Mathematics.Random; // Unity.Mathematics is faster
+using Unity.Mathematics;
+using Random = Unity.Mathematics.Random;
 
 namespace PCG.Modules.Environment
 {
     public class MazeGenerator : IGeneratorStrategy
     {
-        private static readonly Vector2Int[] Directions = new Vector2Int[]
-        {
-            new Vector2Int(0, 1),  // North
-            new Vector2Int(0, -1), // South
-            new Vector2Int(1, 0),  // East
-            new Vector2Int(-1, 0)  // West
-        }; // These arrays will not change, thus they are static and readonly
-
         /// <summary>
-        /// This method implements an optimised Iterative Backtracker algorithm for mazes
+        /// This method prepares the data, schedules the Burst-compiled job, and waits for its completion.
         /// </summary>
         public MapData Generate(int seed, Vector2Int size)
         {
-            Debug.Log($"[MazeGenerator] Starting with Seed: {seed}");
+            UnityEngine.Debug.Log($"[MazeGenerator] Starting Burst-Compiled Maze with Seed: {seed}");
 
-            MapData map = new MapData(size.x, size.y, Allocator.Persistent); // Data container creation
-            Random rng = new Random((uint)seed);
-            
-            // At first, everything's wall
+            // 1. Create the MapData container. Allocator.Persistent so it survives the job and the frame.
+            MapData map = new MapData(size.x, size.y, Allocator.Persistent);
+
+            // 2. Initialise the grid with walls before passing it to the job.
+            // (We could do this in the job, but doing it here is fine or using a simple memset)
             for (int i = 0; i < map.Grid.Length; i++)
             {
                 map.Grid[i] = CellType.Wall;
             }
 
-            NativeList<int> stack = new NativeList<int>(Allocator.Temp); // It saves the path and goes back
-            NativeArray<bool> visited = new NativeArray<bool>(size.x * size.y, Allocator.Temp); // To keep track of visited cells
+            // 3. Configure the Job
+            MazeJob mazeJob = new MazeJob
+            {
+                Seed = (uint)seed,
+                Width = size.x,
+                Height = size.y,
+                Grid = map.Grid // We pass the native array pointer to the job
+            };
+
+            // 4. Schedule the job on a worker thread and immediately wait for it to finish (Complete).
+            // This blocks the main thread for a microsecond, but thanks to Burst, it's virtually instant.
+            JobHandle handle = mazeJob.Schedule();
+            handle.Complete();
+
+            return map;
+        }
+
+        /// <summary>
+        /// The Burst-compiled job that executes the Iterative Backtracker algorithm purely in native code.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true)] // Forces Unity to compile it immediately
+        private struct MazeJob : IJob
+        {
+            public uint Seed;
+            public int Width;
+            public int Height;
             
-            NativeArray<int> dirIndexes = new NativeArray<int>(4, Allocator.Temp);
-            for (int i = 0; i < 4; i++)
+            public NativeArray<CellType> Grid;
+
+            public void Execute()
             {
-                dirIndexes[i] = i;
-            }
+                Random rng = new Random(Seed);
 
-            int startX = 1;
-            int startY = 1;
-            int startIndex = map.GetIndex(startX, startY);
-            stack.Add(startIndex);
-            visited[startIndex] = true;
-            map.Grid[startIndex] = CellType.Floor; // Initial cell is floor
+                // Local allocations using Allocator.Temp (extremely fast memory allocation that lives only for this frame)
+                NativeList<int> stack = new NativeList<int>(Allocator.Temp);
+                NativeArray<bool> visited = new NativeArray<bool>(Width * Height, Allocator.Temp);
 
-            while (stack.Length > 0)
-            {
-                int currentIndex = stack[stack.Length - 1];
+                // Start from odd coordinates to ensure valid walls around
+                int startX = 1;
+                int startY = 1;
                 
-                // 1D to 2D to calculate neighbours
-                int currentX = currentIndex % size.x;
-                int currentY = currentIndex / size.x;
+                int startIndex = GetIndex(startX, startY);
+                visited[startIndex] = true;
+                Grid[startIndex] = CellType.Floor;
+                stack.Add(startIndex);
 
-                bool foundNeighbor = false;
-                
-                // Local Fisher-Yates Shuffle
-                for (int i = 0; i < 4; i++)
+                // Native array for directions to avoid GC allocation inside the job loop
+                NativeArray<int2> directions = new NativeArray<int2>(4, Allocator.Temp);
+                directions[0] = new int2(0, 1);  // North
+                directions[1] = new int2(0, -1); // South
+                directions[2] = new int2(1, 0);  // East
+                directions[3] = new int2(-1, 0); // West
+
+                NativeArray<int> dirIndexes = new NativeArray<int>(4, Allocator.Temp);
+                for (int i = 0; i < 4; i++) dirIndexes[i] = i;
+
+                while (stack.Length > 0)
                 {
-                    int r = rng.NextInt(i, 4);
-                    int temp = dirIndexes[r];
-                    dirIndexes[r] = dirIndexes[i];
-                    dirIndexes[i] = temp;
-                }
-                
-                for (int i = 0; i < 4; i++)
-                {
-                    int dirIdx = dirIndexes[i];
-                    Vector2Int dir = Directions[dirIdx];
-                    
-                    int targetX = currentX + (dir.x * 2); // Jump 2 cells
-                    int targetY = currentY + (dir.y * 2);
-                    
-                    int wallX = currentX + dir.x; // Carve intermediate cell
-                    int wallY = currentY + dir.y;
-                    
-                    if (targetX > 0 && targetX < size.x - 1 && targetY > 0 && targetY < size.y - 1) // Check if inside the map with a 1 cell margin border
+                    int currentIndex = stack[stack.Length - 1];
+                    int currentX = currentIndex % Width;
+                    int currentY = currentIndex / Width;
+
+                    // Shuffle directions natively
+                    for (int i = 3; i > 0; i--)
                     {
-                        int targetIndex = map.GetIndex(targetX, targetY);
+                        int j = rng.NextInt(i + 1);
+                        int temp = dirIndexes[i];
+                        dirIndexes[i] = dirIndexes[j];
+                        dirIndexes[j] = temp;
+                    }
 
-                        if (!visited[targetIndex])
+                    bool foundNeighbor = false;
+
+                    for (int i = 0; i < 4; i++)
+                    {
+                        int2 dir = directions[dirIndexes[i]];
+                        
+                        // We check the cell that is 2 steps away
+                        int targetX = currentX + (dir.x * 2);
+                        int targetY = currentY + (dir.y * 2);
+                        
+                        // Carve intermediate cell
+                        int wallX = currentX + dir.x; 
+                        int wallY = currentY + dir.y;
+                        
+                        // Check if inside the map with a 1 cell margin border
+                        if (targetX > 0 && targetX < Width - 1 && targetY > 0 && targetY < Height - 1) 
                         {
-                            visited[targetIndex] = true;
-                            map.Grid[targetIndex] = CellType.Floor;
-                            
-                            int wallIndex = map.GetIndex(wallX, wallY);
-                            map.Grid[wallIndex] = CellType.Floor; // Hacemos pasillo
+                            int targetIndex = GetIndex(targetX, targetY);
 
-                            stack.Add(targetIndex);
-                            foundNeighbor = true;
-                            break;
+                            if (!visited[targetIndex])
+                            {
+                                visited[targetIndex] = true;
+                                Grid[targetIndex] = CellType.Floor;
+                                
+                                int wallIndex = GetIndex(wallX, wallY);
+                                Grid[wallIndex] = CellType.Floor; // Carve path
+
+                                stack.Add(targetIndex);
+                                foundNeighbor = true;
+                                break;
+                            }
                         }
+                    }
+
+                    // If no neighbour has been found, it backtracks
+                    if (!foundNeighbor) 
+                    {
+                        stack.RemoveAt(stack.Length - 1);
                     }
                 }
 
-                if (!foundNeighbor) // If no neighbour has been found, it backtracks
-                {
-                    stack.RemoveAt(stack.Length - 1);
-                }
+                // Dispose temp arrays to free up stack memory immediately
+                stack.Dispose();
+                visited.Dispose();
+                directions.Dispose();
+                dirIndexes.Dispose();
             }
 
-            stack.Dispose(); // Clean stack
-            visited.Dispose(); // Clean visited
-            dirIndexes.Dispose(); // Clean dirIndexes
-
-            return map; // Map is not visited because it is needed in the return
+            // Helper method internal to the Job
+            private int GetIndex(int x, int y)
+            {
+                return (y * Width) + x;
+            }
         }
     }
 }
