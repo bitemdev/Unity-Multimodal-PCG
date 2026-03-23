@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Unity.Collections;
 using PCG.Core;
@@ -21,6 +22,9 @@ namespace PCG.Modules.Entities
 
         private GameObject _currentPlayer;
         private GameObject _currentExit;
+        
+        // Tracks all entities spawned in the current session to manage their save states
+        private List<EntityIdentifier> _currentLevelEntities = new List<EntityIdentifier>();
 
         private void OnEnable()
         {
@@ -46,6 +50,9 @@ namespace PCG.Modules.Entities
         {
             _enemyPool.DeactivateAll();
             _objectPool.DeactivateAll();
+            _currentLevelEntities.Clear();
+            
+            int entityIdCounter = 0;
 
             foreach (SpawnPoint point in spawnPoints)
             {
@@ -65,12 +72,119 @@ namespace PCG.Modules.Entities
                     case EntityType.Enemy:
                         GameObject enemy = _enemyPool.Get();
                         PlaceAndAdjust(enemy, basePosition, rotation);
+                        RegisterEntity(enemy, entityIdCounter++, EntityType.Enemy);
                         break;
 
                     case EntityType.Object:
                         GameObject obj = _objectPool.Get();
                         PlaceAndAdjust(obj, basePosition, rotation);
+                        RegisterEntity(obj, entityIdCounter++, EntityType.Object);
                         break;
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Attaches or updates an EntityIdentifier to keep track of this specific instance.
+        /// </summary>
+        private void RegisterEntity(GameObject go, int id, EntityType type)
+        {
+            EntityIdentifier ident = go.GetComponent<EntityIdentifier>();
+            
+            // If the user forgot to attach the script to the prefab, add it safely at runtime
+            if (ident == null)
+            {
+                ident = go.AddComponent<EntityIdentifier>();
+            }
+
+            ident.ID = id;
+            ident.Type = type;
+            ident.IsActiveState = true; // Reset state in case it was pulled from a dirty pool
+            
+            _currentLevelEntities.Add(ident);
+        }
+        
+        /// <summary>
+        /// Extracts dynamic state (player transform, alive/dead entities) into the save data.
+        /// </summary>
+        public void FillSaveData(SaveData data)
+        {
+            if (_currentPlayer != null)
+            {
+                data.Player.Position = _currentPlayer.transform.position;
+                data.Player.Rotation = _currentPlayer.transform.rotation;
+            }
+
+            data.Entities.Clear();
+            foreach (var entity in _currentLevelEntities)
+            {
+                if (entity == null) continue;
+
+                EntitySaveData entityData = new EntitySaveData();
+                entityData.ID = entity.ID;
+                entityData.EntityType = (int)entity.Type;
+                
+                // Entity is considered active if it hasn't been explicitly marked as dead AND is physically active
+                entityData.IsActive = entity.IsActiveState && entity.gameObject.activeInHierarchy;
+                
+                if (entityData.IsActive)
+                {
+                    entityData.Position = entity.transform.position;
+                    entityData.Rotation = entity.transform.rotation;
+                }
+
+                data.Entities.Add(entityData);
+            }
+        }
+
+        /// <summary>
+        /// Injects loaded data back into the scene, positioning player and handling entity states.
+        /// </summary>
+        public void LoadSaveData(SaveData data)
+        {
+            if (_currentPlayer != null)
+            {
+                CharacterController cc = _currentPlayer.GetComponent<CharacterController>();
+                if (cc) cc.enabled = false;
+
+                _currentPlayer.transform.position = data.Player.Position;
+                _currentPlayer.transform.rotation = data.Player.Rotation;
+
+                if (cc) cc.enabled = true;
+            }
+
+            // Create a quick lookup dictionary for performance
+            Dictionary<int, EntitySaveData> savedEntities = new Dictionary<int, EntitySaveData>();
+            foreach (var e in data.Entities) savedEntities[e.ID] = e;
+
+            // Apply loaded state to the freshly spawned entities
+            foreach (var currentEntity in _currentLevelEntities)
+            {
+                if (savedEntities.TryGetValue(currentEntity.ID, out EntitySaveData savedData))
+                {
+                    if (!savedData.IsActive)
+                    {
+                        currentEntity.IsActiveState = false;
+                        currentEntity.gameObject.SetActive(false); // Hide if it was dead/looted
+                    }
+                    else
+                    {
+                        currentEntity.IsActiveState = true;
+                        currentEntity.gameObject.SetActive(true);
+
+                        // Safe teleportation if the entity is an AI agent
+                        UnityEngine.AI.NavMeshAgent agent = currentEntity.GetComponent<UnityEngine.AI.NavMeshAgent>();
+                        if (agent != null && agent.isOnNavMesh)
+                        {
+                            agent.Warp(savedData.Position);
+                        }
+                        else
+                        {
+                            currentEntity.transform.position = savedData.Position;
+                        }
+                        
+                        currentEntity.transform.rotation = savedData.Rotation;
+                    }
                 }
             }
         }

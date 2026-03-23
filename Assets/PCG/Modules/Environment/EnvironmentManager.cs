@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System;
 using PCG.Core;
 using PCG.Modules.Environment.Rendering;
+using PCG.Modules.Tools;
+using PCG.Modules.Entities;
 
 namespace PCG.Modules.Environment
 {
@@ -45,28 +47,36 @@ namespace PCG.Modules.Environment
 
         private MapData _currentMap;
         private NativeList<SpawnPoint> _spawnPoints;
+        private int _currentSeed;
 
         /// <summary>
-        /// This method generates a full level
+        /// This method generates a full level using the config seed.
         /// </summary>
         [ContextMenu("Generate Level")] // It allows to play from inspector without actually playing
         public void GenerateLevel()
         {
+            // -1 acts as a flag to use the default config seed
+            GenerateLevelDeterministic(-1);
+        }
+        
+        /// <summary>
+        /// Generates the level. If forcedSeed is provided (not -1), it overrides the config.
+        /// Essential for recreating exactly the same level when loading a save.
+        /// </summary>
+        public void GenerateLevelDeterministic(int forcedSeed)
+        {
             if (!ValidateConfiguration())
             {
                 UnityEngine.Debug.LogError("[EnvironmentManager] Generation Aborted: Invalid Configuration.");
+                return;
             }
 
             ClearMemory();
-            
             DestroyOldMesh(_floorMeshFilter);
             DestroyOldMesh(_wallsMeshFilter);
 
-            if (_config == null)
-            {
-                UnityEngine.Debug.LogError("PCGConfiguration config is missing!");
-                return;
-            }
+            // Determine which seed to use
+            _currentSeed = forcedSeed == -1 ? _config.Seed : forcedSeed;
 
             IGeneratorStrategy strategy = GetStrategy(_algorithmType);
             
@@ -74,15 +84,17 @@ namespace PCG.Modules.Environment
             sw.Start();
             
             Vector2Int size = new Vector2Int(_config.Width, _config.Height);
-            _currentMap = strategy.Generate(_config.Seed, size);
+            
+            // Generate using the deterministic seed and expected parameters
+            _currentMap = strategy.Generate(_currentSeed, size);
             _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, _config.InitialEnemyCount, _config.InitialObjectCount, Allocator.Persistent);
             
-            long logicTime = sw.ElapsedMilliseconds; // Captured logic time (array data generation time)
+            long logicTime = sw.ElapsedMilliseconds; 
             
             (Mesh floorMesh, Mesh wallMesh) = ProceduralMeshBuilder.BuildMesh(_currentMap);
             
             sw.Stop();
-            long renderTime = sw.ElapsedMilliseconds - logicTime; // Visual delta
+            long renderTime = sw.ElapsedMilliseconds - logicTime; 
     
             AssignMesh(_floorMeshFilter, _floorMeshRenderer, floorMesh, _floorMaterial, "PCG_Floor");
             AssignMesh(_wallsMeshFilter, _wallsMeshRenderer, wallMesh, _wallsMaterial, "Default");
@@ -108,7 +120,7 @@ namespace PCG.Modules.Environment
             int totalVerts = floorMesh.vertexCount + wallMesh.vertexCount;
             string log = $"[PCG Stats] Map: {_config.Width}x{_config.Height} | ";
             log += $"Total: {sw.Elapsed.TotalMilliseconds:F2}ms (Logic: {logicTime}ms | Mesh: {renderTime}ms) | ";
-            log += $"Vertices: {totalVerts}";
+            log += $"Vertices: {totalVerts} | Seed: {_currentSeed}";
     
             UnityEngine.Debug.Log(log);
         }
@@ -239,6 +251,62 @@ namespace PCG.Modules.Environment
                     return new DungeonGenerator();
                 default:
                     return new MazeGenerator();
+            }
+        }
+        
+        /// <summary>
+        /// Collects current world state and saves it to disk.
+        /// </summary>
+        [ContextMenu("Save Game")]
+        public void SaveCurrentGame()
+        {
+            if (!_currentMap.Grid.IsCreated)
+            {
+                UnityEngine.Debug.LogWarning("[EnvironmentManager] Generate a level first before saving.");
+                return;
+            }
+
+            SaveData data = new SaveData();
+            data.SaveName = "ManualSave";
+            data.Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+            // Store Generation Meta
+            data.Generation.Seed = _currentSeed;
+            data.Generation.Algorithm = _algorithmType.ToString();
+
+            // Store Dynamic Entity State via EntityManager
+            EntityManager entityManager = FindObjectOfType<EntityManager>();
+            if (entityManager != null)
+            {
+                entityManager.FillSaveData(data);
+            }
+
+            SaveSystem.SaveGame(data);
+        }
+
+        /// <summary>
+        /// Reads world state from disk and reconstructs the level deterministically.
+        /// </summary>
+        [ContextMenu("Load Game")]
+        public void LoadLastGame()
+        {
+            SaveData data = SaveSystem.LoadGame();
+            if (data == null) return;
+
+            // Restore Algorithm setting
+            if (Enum.TryParse(data.Generation.Algorithm, out GenerationAlgorithm algo))
+            {
+                _algorithmType = algo;
+            }
+
+            // Regenerate the map using the exact saved seed
+            GenerateLevelDeterministic(data.Generation.Seed);
+
+            // Reconstruct dynamic state (Player pos, dead enemies, etc.)
+            EntityManager entityManager = FindObjectOfType<EntityManager>();
+            if (entityManager != null)
+            {
+                entityManager.LoadSaveData(data);
             }
         }
 
