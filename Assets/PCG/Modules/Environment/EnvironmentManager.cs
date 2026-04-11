@@ -14,12 +14,12 @@ namespace PCG.Modules.Environment
         Maze_Backtracker,
         Dungeon_BSP
     }
-    
+
     [DisallowMultipleComponent] // With this, only 1 manager per GameObject is allowed
     public class EnvironmentManager : MonoBehaviour
     {
         public event Action<NativeList<SpawnPoint>> OnLevelGenerated;
-        
+
         [Header("Dependencies")]
         [Tooltip("Configuration file with base parameters.")]
         [SerializeField] private PCGConfiguration _config;
@@ -27,18 +27,18 @@ namespace PCG.Modules.Environment
         [Header("AI & Navigation")]
         [Tooltip("Script which creates the navigable mesh for AI.")]
         [SerializeField] private RuntimeNavMeshBuilder _navMeshBuilder;
-        
+
         [Header("Settings")]
         [Tooltip("Algorithm used by the generation.")]
         [SerializeField] private GenerationAlgorithm _algorithmType;
-        
+
         [Header("Visualization - Floor")]
         [SerializeField] private MeshFilter _floorMeshFilter;
         [SerializeField] private MeshRenderer _floorMeshRenderer;
         [SerializeField] private MeshCollider _floorMeshCollider;
         [Tooltip("If no material is assigned, it will use a debug color.")]
         [SerializeField] private Material _floorMaterial;
-        
+
         [Header("Visualization - Rest")]
         [SerializeField] private MeshFilter _wallsMeshFilter;
         [SerializeField] private MeshRenderer _wallsMeshRenderer;
@@ -58,10 +58,10 @@ namespace PCG.Modules.Environment
             // -1 acts as a flag to use the default config seed
             GenerateLevelDeterministic(-1);
         }
-        
+
         /// <summary>
         /// Generates the level. If forcedSeed is provided (not -1), it overrides the config.
-        /// Essential for recreating exactly the same level when loading a save.
+        /// Highly integrated with the PCGBenchmark tool for academic analysis.
         /// </summary>
         public void GenerateLevelDeterministic(int forcedSeed)
         {
@@ -75,37 +75,41 @@ namespace PCG.Modules.Environment
             DestroyOldMesh(_floorMeshFilter);
             DestroyOldMesh(_wallsMeshFilter);
 
-            // Determine which seed to use
             _currentSeed = forcedSeed == -1 ? _config.Seed : forcedSeed;
+            Vector2Int size = new Vector2Int(_config.Width, _config.Height);
 
             IGeneratorStrategy strategy = GetStrategy(_algorithmType);
-            
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            
-            Vector2Int size = new Vector2Int(_config.Width, _config.Height);
-            
-            // Generate using the deterministic seed and expected parameters
+
+            // ==========================================
+            // BENCHMARK START
+            // ==========================================
+            PCG.Modules.Tools.PCGBenchmark benchmark = new PCG.Modules.Tools.PCGBenchmark(
+                _currentSeed, size.x, size.y, _algorithmType.ToString());
+
+            // 1. PHASE: LOGIC (Algorithm Execution)
+            benchmark.StartPhase("AlgorithmLogic");
             _currentMap = strategy.Generate(_currentSeed, size);
-            _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, _config.InitialEnemyCount, _config.InitialObjectCount, Allocator.Persistent);
-            
-            long logicTime = sw.ElapsedMilliseconds; 
-            
+            benchmark.StopPhase();
+
+            // 2. PHASE: MESH BUILDING (Burst Compiled)
+            benchmark.StartPhase("MeshBuilding");
             (Mesh floorMesh, Mesh wallMesh) = ProceduralMeshBuilder.BuildMesh(_currentMap);
-            
-            sw.Stop();
-            long renderTime = sw.ElapsedMilliseconds - logicTime; 
-    
+            benchmark.StopPhase();
+
+            // Sub-phase: Assigning Meshes to Unity Components (Main Thread API)
+            benchmark.StartPhase("MeshAssignment");
             AssignMesh(_floorMeshFilter, _floorMeshRenderer, floorMesh, _floorMaterial, "PCG_Floor");
             AssignMesh(_wallsMeshFilter, _wallsMeshRenderer, wallMesh, _wallsMaterial, "Default");
-            
+
             if (_floorMeshCollider != null)
             {
                 _floorMeshCollider.sharedMesh = floorMesh;
             }
-            
             Physics.SyncTransforms();
+            benchmark.StopPhase();
 
+            // 3. PHASE: NAVMESH BAKING
+            benchmark.StartPhase("NavMeshBaking");
             if (_navMeshBuilder != null)
             {
                 _navMeshBuilder.BuildNavMesh();
@@ -114,17 +118,24 @@ namespace PCG.Modules.Environment
             {
                 UnityEngine.Debug.LogWarning("NavMeshBuilder not assigned. AI will not move.");
             }
-            
+            benchmark.StopPhase();
+
+            // 4. PHASE: MAP ANALYSIS (Spawning optimal points)
+            benchmark.StartPhase("MapAnalysis");
+            _spawnPoints = MapAnalyzer.GetOptimalSpawnPoints(_currentMap, _config.InitialEnemyCount, _config.InitialObjectCount, Allocator.Persistent);
+            benchmark.StopPhase();
+
+            // 5. PHASE: ENTITY SPAWNING & AUDIO INITIALISATION (Events)
+            benchmark.StartPhase("EntitySpawningAndEvents");
             OnLevelGenerated?.Invoke(_spawnPoints);
-    
-            int totalVerts = floorMesh.vertexCount + wallMesh.vertexCount;
-            string log = $"[PCG Stats] Map: {_config.Width}x{_config.Height} | ";
-            log += $"Total: {sw.Elapsed.TotalMilliseconds:F2}ms (Logic: {logicTime}ms | Mesh: {renderTime}ms) | ";
-            log += $"Vertices: {totalVerts} | Seed: {_currentSeed}";
-    
-            UnityEngine.Debug.Log(log);
+            benchmark.StopPhase();
+
+            // ==========================================
+            // BENCHMARK END & EXPORT
+            // ==========================================
+            benchmark.FinishAndExport();
         }
-        
+
         /// <summary>
         /// This method destroys old meshes
         /// </summary>
@@ -141,11 +152,11 @@ namespace PCG.Modules.Environment
                 {
                     DestroyImmediate(filter.sharedMesh); // If in editor
                 }
-                
+
                 filter.sharedMesh = null;
             }
         }
-        
+
         /// <summary>
         /// This method is a helper to assign mesh, update collider, set layer and set material
         /// </summary>
@@ -162,7 +173,7 @@ namespace PCG.Modules.Environment
             }
 
             filter.mesh = newMesh;
-            
+
             if (userMaterial != null)
             {
                 renderer.material = userMaterial;
@@ -185,7 +196,7 @@ namespace PCG.Modules.Environment
             {
                 col = filter.gameObject.AddComponent<MeshCollider>();
             }
-            
+
             col.sharedMesh = newMesh;
         }
 
@@ -217,7 +228,7 @@ namespace PCG.Modules.Environment
                 UnityEngine.Debug.LogError("Floor visual components missing via Inspector");
                 return false;
             }
-            
+
             if (_wallsMeshFilter == null || _wallsMeshRenderer == null)
             {
                 UnityEngine.Debug.LogError("Walls visual components missing via Inspector");
@@ -253,7 +264,7 @@ namespace PCG.Modules.Environment
                     return new MazeGenerator();
             }
         }
-        
+
         /// <summary>
         /// Collects current world state and saves it to disk.
         /// </summary>
@@ -314,7 +325,7 @@ namespace PCG.Modules.Environment
         {
             ClearMemory();
         }
-        
+
         private void OnDisable()
         {
             ClearMemory();
@@ -344,7 +355,7 @@ namespace PCG.Modules.Environment
             {
                 DestroyImmediate(_wallsMeshFilter.mesh);
             }
-            
+
             UnityEngine.Debug.Log("Map memory cleaned.");
         }
     }

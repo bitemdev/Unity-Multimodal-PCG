@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: DebugPCGConfig
   m_EditorClassIdentifier: 
   _seed: 2147483647
-  _width: 500
-  _height: 500
+  _width: 250
+  _height: 250
   _initialEnemyCount: 100
   _initialObjectCount: 80
   _bpm: 120

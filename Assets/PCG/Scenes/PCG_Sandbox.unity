@@ -348,6 +348,7 @@ GameObject:
   - component: {fileID: 793826266}
   - component: {fileID: 793826272}
   - component: {fileID: 793826270}
+  - component: {fileID: 793826273}
   m_Layer: 0
   m_Name: EnvironmentManager
   m_TagString: Untagged
@@ -369,7 +370,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _config: {fileID: 11400000, guid: 1403705da5bfa9c45a90f5d89dc2acd8, type: 2}
   _navMeshBuilder: {fileID: 793826270}
-  _algorithmType: 1
+  _algorithmType: 0
   _floorMeshFilter: {fileID: 1542772592}
   _floorMeshRenderer: {fileID: 1542772591}
   _floorMeshCollider: {fileID: 1542772590}
@@ -441,6 +442,20 @@ MonoBehaviour:
   m_MinRegionArea: 2
   m_NavMeshData: {fileID: 0}
   m_BuildHeightMesh: 0
+--- !u!114 &793826273
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 793826265}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 466b19c500cda53418713cf79e305a04, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _iterationsPerConfig: 50
+  _mapSizesToTest: 14000000320000006400000096000000fa000000
 --- !u!1 &810174742
 GameObject:
   m_ObjectHideFlags: 0

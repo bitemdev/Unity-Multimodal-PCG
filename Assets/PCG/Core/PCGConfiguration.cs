@@ -12,31 +12,32 @@ namespace PCG.Core
         public int InitialObjectCount => _initialObjectCount;
         public int BPM => _bpm;
         public float[] PentatonicScale => _pentatonicScale;
-        
+
         [Header("PCG General Settings")]
         [Tooltip("Determinist generation's seed")]
         [SerializeField] private int _seed;
 
         [Header("Map Settings")]
         [Tooltip("Map's width expressed in number of cells")]
-        [SerializeField, Range(10, 500)] private int _width = 50;
+        [SerializeField, Range(10, 250)] private int _width = 50;
         [Tooltip("Map's height expressed in number of cells")]
-        [SerializeField, Range(10, 500)] private int _height = 50;
-        
-        [Header("Entities Settings")] 
+        [SerializeField, Range(10, 250)] private int _height = 50;
+
+        [Header("Entities Settings")]
         [Tooltip("Number of enemies to generate")]
         [SerializeField] private int _initialEnemyCount = 10;
         [Tooltip("Number of objects (loot) to generate")]
         [SerializeField] private int _initialObjectCount = 6;
-        
+
         [Header("Audio Settings")]
         [Tooltip("Music tempo")]
         [SerializeField, Range(60, 180)] private int _bpm = 120;
         [Tooltip("Base notes for procedural generation")]
-        [SerializeField] private float[] _pentatonicScale = new float[]
+        [SerializeField]
+        private float[] _pentatonicScale = new float[]
         {
             65.41f, 77.78f, 87.31f, 98.00f, 116.54f,
-            130.81f, 155.56f, 174.61f, 196.00f, 233.08f, 
+            130.81f, 155.56f, 174.61f, 196.00f, 233.08f,
             261.63f, 311.13f, 349.23f, 392.00f, 466.16f,
             523.25f
         }; // Base frequencies for a scale, Extended Scale with 3 Octaves
