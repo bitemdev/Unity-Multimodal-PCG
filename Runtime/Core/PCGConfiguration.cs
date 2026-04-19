@@ -44,7 +44,7 @@ namespace PCG.Core
 
         // Security constants
         private const int MIN_SIZE = 20; // Less than 20x20 cells often break BSP
-        private const int MAX_SIZE = 500; // More than 500x500 may cause lag on mobile
+        private const int MAX_SIZE = 250; // More than 250x250 may cause lag on mobile
         private const int MIN_BPM = 40;
         private const int MAX_BPM = 240;
 

@@ -41,9 +41,6 @@ namespace PCG.Modules.Tools
             int totalRuns = 0;
 
             // Extract the PCGConfiguration to temporarily override its values
-            // Note: In a strict architecture, we might use reflection or a specific public method, 
-            // but we assume the config is accessible or we alter the manager state.
-
             // Loop through algorithms
             GenerationAlgorithm[] algorithms = { GenerationAlgorithm.Maze_Backtracker, GenerationAlgorithm.Dungeon_BSP };
 
