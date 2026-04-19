@@ -1,0 +1,11 @@
+{
+  "name": "com.bitemdev.unitymultimodalpcgframework",
+  "version": "1.0.0",
+  "displayName": "Unity Multimodal PCG Framework",
+  "description": "High-performance, multimodal Procedural Content Generation (PCG) framework. Includes environment generation (BSP & Backtracker), entity pooling, dynamic audio, and state serialisation. Optimised with Data-Oriented Design (DOD), the Unity Job System, and Burst Compiler for Zero GC runtime execution.",
+  "unity": "6000.1",
+  "author": {
+    "name": "bitemdev",
+    "email": "bitemgamedev@gmail.com"
+  }
+}
