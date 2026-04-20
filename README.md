@@ -25,6 +25,3 @@ This tool is distributed as a standard UPM package. To install it in your Unity 
 ## Architecture Overview
 
 The framework is strictly decoupled. It separates environment logic from entity management and audio generation, ensuring clean architecture. Heavy grid analysis and mesh building are offloaded to asynchronous Burst-compiled Jobs, guaranteeing a smooth frame rate even on large map generations.
-
----
-*Developed by Miguel Díaz Samper (bitemdev).*
