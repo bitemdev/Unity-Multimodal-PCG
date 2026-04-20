@@ -22,7 +22,7 @@ This tool is distributed as a standard UPM package. To install it in your Unity 
 4. Paste the following URL and click Add:
    `https://github.com/bitemdev/Unity-Multimodal-PCG.git`
 
-## 🛠️ Architecture Overview
+## Architecture Overview
 
 The framework is strictly decoupled. It separates environment logic from entity management and audio generation, ensuring clean architecture. Heavy grid analysis and mesh building are offloaded to asynchronous Burst-compiled Jobs, guaranteeing a smooth frame rate even on large map generations.
 
