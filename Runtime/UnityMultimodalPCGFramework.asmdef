@@ -1,0 +1,14 @@
+{
+    "name": "UnityMultimodalPCGFramework",
+    "rootNamespace": "PCG",
+    "references": [
+        "Unity.Burst",
+        "Unity.Mathematics",
+        "Unity.Collections",
+        "Unity.AI.Navigation"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "autoReferenced": true
+}

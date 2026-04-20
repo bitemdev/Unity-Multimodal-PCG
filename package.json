@@ -14,5 +14,12 @@
     "generation",
     "dod",
     "burst"
+  ],
+  "samples": [
+    {
+      "displayName": "Demo",
+      "description": "Technical demo showcasing the multimodal generation system.",
+      "path": "Samples~"
+    }
   ]
 }

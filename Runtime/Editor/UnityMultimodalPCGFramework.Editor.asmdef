@@ -1,0 +1,11 @@
+{
+    "name": "UnityMultimodalPCGFramework.Editor",
+    "rootNamespace": "PCG.Editor",
+    "references": [
+        "UnityMultimodalPCGFramework"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": []
+}
