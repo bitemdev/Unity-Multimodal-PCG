@@ -15,6 +15,9 @@
     "dod",
     "burst"
   ],
+  "dependencies": {
+    "com.unity.ai.navigation": "2.0.6"
+  },
   "samples": [
     {
       "displayName": "Demo",

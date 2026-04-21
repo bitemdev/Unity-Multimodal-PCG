@@ -2,7 +2,8 @@
     "name": "UnityMultimodalPCGFramework.Editor",
     "rootNamespace": "PCG.Editor",
     "references": [
-        "UnityMultimodalPCGFramework"
+        "UnityMultimodalPCGFramework",
+        "Unity.AI.Navigation"
     ],
     "includePlatforms": [
         "Editor"
